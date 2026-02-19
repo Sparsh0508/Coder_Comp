@@ -17,8 +17,16 @@ const createUser = async (username, email, passwordHash) => {
 
   return result.insertId;
 };
+const findUserByEmail = async (email) => {
+  const [row] = await db.query(
+    `SELECT * FROM USERS WHERE email = ?`,
+    [email]
+  )
+  return row[0];
+}
 
 module.exports = {
   findUserByEmailOrUsername,
   createUser,
+  findUserByEmail
 };
