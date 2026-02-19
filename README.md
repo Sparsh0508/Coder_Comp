@@ -10,3 +10,37 @@ battle-coding/
 ├── docs/                   → API docs & architecture notes
 └── README.md
 ```
+```
+server/
+│
+├── src/
+│   ├── config/
+│   │   ├── db.js
+│   │   ├── redis.js
+│   │   └── logger.js   ✅ (NEW)
+│
+│   ├── modules/
+│   │   ├── auth/
+│   │   ├── match/
+│   │   ├── submission/
+│   │   ├── wallet/
+│   │   └── leaderboard/
+│
+│   ├── middlewares/
+│   │   ├── error.middleware.js
+│   │   └── requestLogger.middleware.js  ✅ (NEW)
+│
+│   ├── sockets/
+│   ├── services/
+│   ├── utils/
+│   ├── app.js
+│   └── server.js
+│
+├── logs/                ✅ (NEW)
+│   ├── error.log
+│   └── combined.log
+│
+├── Dockerfile
+└── package.json
+
+```
