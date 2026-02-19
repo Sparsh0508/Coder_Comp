@@ -5,5 +5,13 @@ const pool = mySQL.createPool({
   password: process.env.DB_PASS,
   database: process.env.DB_NAME,
 })
+pool.getConnection((err, connection) => {
+  if (err) {
+    console.error(" Database connection failed:", err.message);
+  } else {
+    console.log(" MySQL Connected Successfully");
+    connection.release();
+  }
+})
 
 module.exports = pool.promise();
