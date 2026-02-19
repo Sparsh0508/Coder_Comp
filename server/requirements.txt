@@ -1,1 +1,1 @@
-npm i mysql2 express dotenv
+npm i mysql2 express dotenv joi
