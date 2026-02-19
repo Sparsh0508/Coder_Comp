@@ -1,1 +1,1 @@
-npm i mysql2 express dotenv joi
+npm i mysql2 express dotenv joi jsonwebtoken bcrypt
