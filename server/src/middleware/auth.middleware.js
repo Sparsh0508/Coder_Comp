@@ -10,7 +10,7 @@ const authMiddleware = async (req,res,next)=>{
     const decode = jwt.verify(token,process.env.JWT_SECRET)
      const [rows] = await db.query(
       "SELECT id, username, is_banned FROM users WHERE id = ?",
-      [decoded.id]
+      [decode.id]
     );
        const user = rows[0];
 
