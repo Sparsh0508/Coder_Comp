@@ -44,3 +44,15 @@ server/
 └── package.json
 
 ```
+
+```
+match/
+│
+├── match.routes.js
+├── match.controller.js
+├── match.service.js
+├── match.validation.js
+├── match.constants.js
+└── match.socket.js      ← (real-time logic)
+
+```
