@@ -1,14 +1,15 @@
 {
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "fs": "^0.0.1-security",
     "ioredis": "^5.9.3",
     "joi": "^18.0.2",
     "jsonwebtoken": "^9.0.3",
-    "mysql2": "^3.17.2",
-    "nodemon": "^3.1.11",
+    "mysql2": "^3.18.0",
+    "nodemon": "^3.1.14",
     "path": "^0.12.7",
     "socket.io-client": "^4.8.3"
   },

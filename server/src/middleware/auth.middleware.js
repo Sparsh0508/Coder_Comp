@@ -1,18 +1,19 @@
-const jwt = require("jsonwebtoken")
-const authMiddleware = async (req,res,next)=>{
+const jwt = require("jsonwebtoken");
+const db = require("../config/db");
+
+const authMiddleware = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    if(!authHeader || !authHeader.startWith("Bearer ")){
-      return res.status(401).json({message:"Unauthorized "})
-
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ message: "Unauthorized " })
     }
     const token = authHeader.split(" ")[1];
-    const decode = jwt.verify(token,process.env.JWT_SECRET)
-     const [rows] = await db.query(
-      "SELECT id, username, is_banned FROM users WHERE id = ?",
+    const decode = jwt.verify(token, process.env.JWT_SECRET)
+    const [rows] = await db.query(
+      "SELECT id, username, role, is_banned FROM users WHERE id = ?",
       [decode.id]
     );
-       const user = rows[0];
+    const user = rows[0];
 
     if (!user) {
       return res.status(401).json({ message: "User not found" });

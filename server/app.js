@@ -10,5 +10,7 @@ app.use(express.json());
 
 app.use("/api/router", userRoutes);
 app.use("/api/auth", authRoutes);
-
+app.post("/_ping", (req, res) => {
+  res.status(200).json({ ok: true });
+});
 module.exports = app; 

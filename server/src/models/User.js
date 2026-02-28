@@ -6,6 +6,7 @@ class User {
     this.rating = data.rating;
     this.rank = data.rank;
     this.walletBalance = data.wallet_balance;
+    this.role = data.role;
   }
 }
 

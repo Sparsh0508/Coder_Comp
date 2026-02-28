@@ -5,6 +5,8 @@ const { registerSchema } = require("./auth.validation");
 
 const register = async (req, res) => {
   try {
+    console.log("Heelos");
+
     const { error } = registerSchema.validate(req.body);
     if (error) {
       return res.status(400).json({ message: error.details[0].message });
@@ -17,7 +19,7 @@ const register = async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 10);
     const userId = await authService.createUser(username, email, passwordHash);
     const token = jwt.sign(
-      { id: userId },
+      { id: userId, role: 'user' },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -50,7 +52,8 @@ const login = async (req, res) => {
         id: existingUser.id,
         email: existingUser.email,
         username: existingUser.username,
-        rank: existingUser.rank
+        rank: existingUser.rank,
+        role: existingUser.role
       },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
@@ -63,7 +66,8 @@ const login = async (req, res) => {
         email: existingUser.email,
         username: existingUser.username,
         rank: existingUser.rank,
-        rating: existingUser.rating
+        rating: existingUser.rating,
+        role: existingUser.role
       },
     });
 
@@ -72,9 +76,14 @@ const login = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
+const getProfile = async (req, res) => {
+  console.log("Heelos");
 
+  res.render("profile");
+}
 
 module.exports = {
   register,
-  login
+  login,
+  getProfile
 };
