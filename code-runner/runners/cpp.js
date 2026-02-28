@@ -5,92 +5,100 @@ const { v4: uuid } = require("uuid");
 
 async function runCpp(code, input) {
   return new Promise((resolve) => {
+    let finished = false;
 
     const id = uuid();
     const dir = path.join(__dirname, "temp", id);
-
     fs.mkdirSync(dir, { recursive: true });
 
-    const fileName = "main.cpp";
-    const filePath = path.join(dir, fileName);
-
+    const filePath = path.join(dir, "main.cpp");
     fs.writeFileSync(filePath, code);
 
-    // Compile
-    const compile = spawn("g++", ["main.cpp", "-o", "main.exe"], { cwd: dir });
+    let dockerPath = path.resolve(dir);
 
-    let compileError = "";
+    const dockerCommand = [
+      "run",
+      "-i",
+      "--rm",
+      "--memory=200m",
+      "--cpus=0.5",
+      "--network=none",
+      "--pids-limit=50",
+      "-v",
+      `${dockerPath}:/app`,
+      "gcc:latest",
+      "sh",
+      "-c",
+      "g++ /app/main.cpp -o /app/main && /app/main"
+    ];
 
-    compile.stderr.on("data", (data) => {
-      compileError += data.toString();
+    const run = spawn("docker", dockerCommand, {
+      stdio: ["pipe", "pipe", "pipe"]
     });
 
-    compile.on("close", (compileCode) => {
+    let stdout = "";
+    let stderr = "";
 
-      if (compileCode !== 0) {
+    const timeout = setTimeout(() => {
+      if (!finished) {
+        finished = true;
+        run.kill("SIGKILL");
+        cleanup();
+        resolve({ status: "Time Limit Exceeded" });
+      }
+    }, 5000);
+
+    if (input) {
+      run.stdin.write(input + "\n");
+    }
+    run.stdin.end();
+
+    run.stdout.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    run.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    run.on("close", (code) => {
+      if (finished) return;
+      finished = true;
+
+      clearTimeout(timeout);
+      cleanup();
+
+      if (code !== 0 && stderr) {
         return resolve({
-          status: "Compilation Error",
-          error: compileError
+          status: "Compilation or Runtime Error",
+          error: stderr
         });
       }
 
-      // Run compiled file
-      const run = spawn("main.exe", [], { cwd: dir });
-
-      let stdout = "";
-      let stderr = "";
-
-      const timeout = setTimeout(() => {
-        run.kill("SIGKILL");
-        return resolve({
-          status: "Time Limit Exceeded"
-        });
-      }, 2000);
-
-      run.stdin.write(input);
-      run.stdin.end();
-
-      run.stdout.on("data", (data) => {
-        stdout += data.toString();
+      return resolve({
+        status: "Success",
+        output: stdout
       });
-
-      run.stderr.on("data", (data) => {
-        stderr += data.toString();
-      });
-
-      run.on("close", () => {
-        clearTimeout(timeout);
-
-        if (stderr) {
-          return resolve({
-            status: "Runtime Error",
-            error: stderr
-          });
-        }
-
-        return resolve({
-          status: "Success",
-          output: stdout
-        });
-      });
-
-      run.on("error", (err) => {
-        clearTimeout(timeout);
-        return resolve({
-          status: "Internal Error",
-          error: err.message
-        });
-      });
-
     });
 
-    compile.on("error", (err) => {
+    run.on("error", (err) => {
+      if (finished) return;
+      finished = true;
+
+      clearTimeout(timeout);
+      cleanup();
+
       return resolve({
         status: "Internal Error",
         error: err.message
       });
     });
 
+    function cleanup() {
+      try {
+        fs.rmSync(dir, { recursive: true, force: true });
+      } catch {}
+    }
   });
 }
 

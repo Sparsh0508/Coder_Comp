@@ -5,28 +5,55 @@ const { v4: uuid } = require("uuid");
 
 async function runPython(code, input) {
   return new Promise((resolve) => {
+    let finished = false;
 
     const id = uuid();
-    const dir = path.join(__dirname, "temp", id);
+    const baseTempDir = path.join(__dirname, "temp");
+    const dir = path.join(baseTempDir, id);
 
     fs.mkdirSync(dir, { recursive: true });
 
     const filePath = path.join(dir, "main.py");
     fs.writeFileSync(filePath, code);
 
-    const run = spawn("python", ["main.py"], { cwd: dir });
+    // ✅ Resolve absolute path
+    let dockerPath = path.resolve(dir);
+
+    const dockerCommand = [
+      "run",
+      "-i",
+      "--rm",
+      "--memory=100m",
+      "--cpus=0.5",
+      "--network=none",
+      "--pids-limit=50",
+      "-v",
+      `${dockerPath}:/app`,
+      "python:3.10",
+      "python",
+      "/app/main.py"
+    ];
+
+    const run = spawn("docker", dockerCommand, {
+      stdio: ["pipe", "pipe", "pipe"]
+    });
 
     let stdout = "";
     let stderr = "";
 
     const timeout = setTimeout(() => {
-      run.kill("SIGKILL");
-      return resolve({
-        status: "Time Limit Exceeded"
-      });
-    }, 2000);
+      if (!finished) {
+        finished = true;
+        run.kill("SIGKILL");
+        cleanup();
+        resolve({ status: "Time Limit Exceeded" });
+      }
+    }, 3000);
 
-    run.stdin.write(input);
+    // ✅ Pass input correctly
+    if (input) {
+      run.stdin.write(input + "\n");
+    }
     run.stdin.end();
 
     run.stdout.on("data", (data) => {
@@ -38,7 +65,11 @@ async function runPython(code, input) {
     });
 
     run.on("close", () => {
+      if (finished) return;
+      finished = true;
+
       clearTimeout(timeout);
+      cleanup();
 
       if (stderr) {
         return resolve({
@@ -54,13 +85,23 @@ async function runPython(code, input) {
     });
 
     run.on("error", (err) => {
+      if (finished) return;
+      finished = true;
+
       clearTimeout(timeout);
+      cleanup();
+
       return resolve({
         status: "Internal Error",
         error: err.message
       });
     });
 
+    function cleanup() {
+      try {
+        fs.rmSync(dir, { recursive: true, force: true });
+      } catch { }
+    }
   });
 }
 
