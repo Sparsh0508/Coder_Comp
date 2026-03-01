@@ -27,6 +27,12 @@ const register = async (req, res) => {
     return res.status(201).json({
       message: "User registered successfully",
       token,
+      user: {
+        id: userId,
+        username,
+        email,
+        role: 'user'
+      }
     });
 
   } catch (err) {
@@ -77,10 +83,10 @@ const login = async (req, res) => {
   }
 };
 const getProfile = async (req, res) => {
-  console.log("Heelos");
-
-  res.render("profile");
-}
+  return res.status(200).json({
+    user: req.user
+  });
+};
 
 module.exports = {
   register,

@@ -1,0 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-outfit: "Outfit", sans-serif;
+  --color-bg-deep: #050508;
+  --color-card-bg: rgba(18, 18, 24, 0.85);
+  --color-glass-border: rgba(255, 255, 255, 0.1);
+  --color-text-secondary: #a0a0b0;
+  --color-accent: #7000ff;
+
+  --background-image-primary-gradient: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%);
+}
+
+@layer base {
+  body {
+    @apply font-outfit bg-bg-deep text-white min-h-screen overflow-x-hidden;
+    background-image:
+      radial-gradient(circle at 20% 20%, rgba(112, 0, 255, 0.15) 0%, transparent 40%),
+      radial-gradient(circle at 80% 80%, rgba(0, 210, 255, 0.15) 0%, transparent 40%);
+  }
+}
+
+/* Custom Utilities that might not be easily tailwind-ified without many classes */
+.glass-effect {
+  @apply backdrop-blur-xl border border-glass-border bg-card-bg;
+}
+
+.auth-gradient-text {
+  @apply bg-clip-text text-transparent bg-primary-gradient bg-fixed;
+}
+
+.auth-button-shadow {
+  box-shadow: 0 10px 15px -3px rgba(58, 123, 213, 0.4);
+}
+
+.auth-button-shadow:hover {
+  box-shadow: 0 20px 25px -5px rgba(58, 123, 213, 0.5);
+}

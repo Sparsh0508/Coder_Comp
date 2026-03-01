@@ -1,7 +1,28 @@
 const express = require('express');
+const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
+
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "http://localhost:5000",
+  "http://127.0.0.1:5000"
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
+  },
+  credentials: true
+}));
 
 const userRoutes = require("./src/modules/user/user.routes");
 const authRoutes = require("./src/modules/auth/auth.routes");
