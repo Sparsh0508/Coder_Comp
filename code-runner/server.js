@@ -1,21 +1,25 @@
 const express = require("express");
+const cors = require("cors");
+
 const { runPython } = require("./runners/python");
 const { runCpp } = require("./runners/cpp");
 const { runJava } = require("./runners/java");
 
 const app = express();
+
+app.use(cors());
 app.use(express.json());
 
-const problems = {
-  sum: {
-    timeLimit: 2000, 
-    testCases: [
-      { input: "2 3", output: "5" },
-      { input: "10 20", output: "30" },
-      { input: "100 200", output: "300" }
-    ]
-  }
-};
+// const problems = {
+//   sum: {
+//     timeLimit: 2000,
+//     testCases: [
+//       { input: "2 3", output: "5" },
+//       { input: "10 20", output: "30" },
+//       { input: "100 200", output: "300" }
+//     ]
+//   }
+// };
 
 function getRunner(language) {
   if (language === "python") return runPython;
@@ -24,7 +28,16 @@ function getRunner(language) {
   return null;
 }
 
-app.post("/run", async (req, res) => {
+function runWithTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("TLE")), ms)
+    )
+  ]);
+}
+
+app.post("/api/run", async (req, res) => {
   const { language, code, input } = req.body;
 
   const runner = getRunner(language);
@@ -34,34 +47,49 @@ app.post("/run", async (req, res) => {
 
   try {
     const result = await runner(code, input);
-    return res.json(result);
-  } catch (error) {
-    return res.status(500).json({
-      status: "Internal Error",
-      error: error.message
+
+    return res.json({
+      output: result.output || "",
+      status: result.status
+    });
+
+  } catch (err) {
+    return res.json({
+      output: "",
+      status: "Runtime Error"
     });
   }
 });
 
-
-app.post("/submit", async (req, res) => {
-  const { language, code, problemId } = req.body;
-
-  const problem = problems[problemId];
-  if (!problem) {
-    return res.status(404).json({ error: "Problem not found" });
-  }
+app.post("/api/submit", async (req, res) => {
+  const { language, code } = req.body;
 
   const runner = getRunner(language);
+
   if (!runner) {
     return res.status(400).json({ error: "Unsupported language" });
   }
+
+  
+  const problem = {
+    timeLimit: 3000,
+    testCases: [
+      { input: "2 7 11 15\n9", output: "[0, 1]" },
+      { input: "3 2 4\n6", output: "[1, 2]" },
+      { input: "3 3\n6", output: "[0, 1]" }
+    ]
+  };
 
   for (let i = 0; i < problem.testCases.length; i++) {
     const test = problem.testCases[i];
 
     try {
-      const result = await runner(code, test.input);
+      const result = await Promise.race([
+        runner(code, test.input),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("TLE")), problem.timeLimit)
+        )
+      ]);
 
       
       if (result.status !== "Success") {
@@ -71,7 +99,7 @@ app.post("/submit", async (req, res) => {
         });
       }
 
-     
+   
       if (result.output.trim() !== test.output.trim()) {
         return res.json({
           status: "Wrong Answer",
@@ -83,15 +111,21 @@ app.post("/submit", async (req, res) => {
 
     } catch (err) {
       return res.json({
-        status: "Runtime Error",
+        status: err.message === "TLE" ? "Time Limit Exceeded" : "Runtime Error",
         failedCase: i + 1
       });
     }
   }
 
-  return res.json({ status: "Accepted" });
+  return res.json({
+    status: "Accepted"
+  });
 });
 
+  return res.json({
+    status: "Accepted"
+  });
+});
 
 app.listen(5001, () => {
   console.log("Code Runner running on port 5001");

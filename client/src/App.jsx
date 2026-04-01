@@ -3,6 +3,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Login from './components/Auth/Login'
 import Signup from './components/Auth/Signup'
+import DashBoard from './pages/DashBoard'
+import CodeEditor from './pages/CodeEditor'
+import Problem from './pages/Problem'
+
 
 // User Dashboard Component
 const UserDashboard = () => {
@@ -69,12 +73,14 @@ function App() {
     <Router>
       <AuthProvider>
         <Routes>
+          <Route path="/code" element={<CodeEditor />} />
+          <Route path="/problem" element={<Problem />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
 
           <Route path="/dashboard" element={
             <ProtectedRoute allowedRoles={['user']}>
-              <UserDashboard />
+              <DashBoard />
             </ProtectedRoute>
           } />
 

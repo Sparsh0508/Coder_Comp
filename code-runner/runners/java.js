@@ -3,18 +3,14 @@ const path = require("path");
 const { spawn } = require("child_process");
 const { v4: uuid } = require("uuid");
 
-async function runJava(code, input) {
+async function runJava(code, input = "") {
   return new Promise((resolve) => {
-    let finished = false;
-
     const id = uuid();
     const dir = path.join(__dirname, "temp", id);
     fs.mkdirSync(dir, { recursive: true });
 
     const filePath = path.join(dir, "Main.java");
     fs.writeFileSync(filePath, code);
-
-    let dockerPath = path.resolve(dir);
 
     const dockerCommand = [
       "run",
@@ -25,31 +21,21 @@ async function runJava(code, input) {
       "--network=none",
       "--pids-limit=50",
       "-v",
-      `${dockerPath}:/app`,
+      `${dir}:/app`,
       "eclipse-temurin:17",
       "sh",
       "-c",
       "javac /app/Main.java && java -cp /app Main"
     ];
 
-    const run = spawn("docker", dockerCommand, {
-      stdio: ["pipe", "pipe", "pipe"]
-    });
+    const run = spawn("docker", dockerCommand);
 
     let stdout = "";
     let stderr = "";
 
-    const timeout = setTimeout(() => {
-      if (!finished) {
-        finished = true;
-        run.kill("SIGKILL");
-        cleanup();
-        resolve({ status: "Time Limit Exceeded" });
-      }
-    }, 5000);
-
+   
     if (input) {
-      run.stdin.write(input + "\n");
+      run.stdin.write(input);
     }
     run.stdin.end();
 
@@ -61,44 +47,32 @@ async function runJava(code, input) {
       stderr += data.toString();
     });
 
-    run.on("close", (code) => {
-      if (finished) return;
-      finished = true;
+    const cleanup = () => {
+      fs.rmSync(dir, { recursive: true, force: true });
+    };
 
+    const timeout = setTimeout(() => {
+      run.kill("SIGKILL");
+      cleanup();
+      resolve({ status: "TLE", output: "" });
+    }, 5000);
+
+    run.on("close", (code) => {
       clearTimeout(timeout);
       cleanup();
 
-      if (code !== 0 && stderr) {
+      if (code !== 0) {
         return resolve({
-          status: "Compilation or Runtime Error",
-          error: stderr
+          status: "Error",
+          output: stderr
         });
       }
 
-      return resolve({
+      resolve({
         status: "Success",
-        output: stdout
+        output: stdout.trim()   
       });
     });
-
-    run.on("error", (err) => {
-      if (finished) return;
-      finished = true;
-
-      clearTimeout(timeout);
-      cleanup();
-
-      return resolve({
-        status: "Internal Error",
-        error: err.message
-      });
-    });
-
-    function cleanup() {
-      try {
-        fs.rmSync(dir, { recursive: true, force: true });
-      } catch {}
-    }
   });
 }
 

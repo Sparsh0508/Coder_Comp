@@ -26,11 +26,12 @@ app.use(cors({
 
 const userRoutes = require("./src/modules/user/user.routes");
 const authRoutes = require("./src/modules/auth/auth.routes");
-
+const dashboardRoutes = require("./src/modules/dashboard/dashboard.routes.js")
 app.use(express.json());
 
 app.use("/api/router", userRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 app.post("/_ping", (req, res) => {
   res.status(200).json({ ok: true });
 });

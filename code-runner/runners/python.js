@@ -16,7 +16,6 @@ async function runPython(code, input) {
     const filePath = path.join(dir, "main.py");
     fs.writeFileSync(filePath, code);
 
-    // ✅ Resolve absolute path
     let dockerPath = path.resolve(dir);
 
     const dockerCommand = [
@@ -50,7 +49,6 @@ async function runPython(code, input) {
       }
     }, 3000);
 
-    // ✅ Pass input correctly
     if (input) {
       run.stdin.write(input + "\n");
     }
