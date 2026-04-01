@@ -16,21 +16,26 @@ async function runPython(code, input) {
     const filePath = path.join(dir, "main.py");
     fs.writeFileSync(filePath, code);
 
-    let dockerPath = path.resolve(dir);
+    // ✅ Fix Windows path issue
+    const dockerPath = dir.replace(/\\/g, "/");
 
     const dockerCommand = [
       "run",
-      "-i",
       "--rm",
+      "-i",
+      "--init",
       "--memory=100m",
       "--cpus=0.5",
       "--network=none",
       "--pids-limit=50",
       "-v",
       `${dockerPath}:/app`,
+      "-w",
+      "/app",
       "python:3.10",
       "python",
-      "/app/main.py"
+      "-u",
+      "main.py"
     ];
 
     const run = spawn("docker", dockerCommand, {
@@ -40,48 +45,74 @@ async function runPython(code, input) {
     let stdout = "";
     let stderr = "";
 
+    // ⏱ Timeout (3 sec)
     const timeout = setTimeout(() => {
       if (!finished) {
         finished = true;
         run.kill("SIGKILL");
         cleanup();
-        resolve({ status: "Time Limit Exceeded" });
+        return resolve({ status: "Time Limit Exceeded" });
       }
-    }, 3000);
+    }, 3000); 
 
+    // ✅ Input handling
     if (input) {
-      run.stdin.write(input + "\n");
-    }
-    run.stdin.end();
+      if (input.length > 5000) {
+        cleanup();
+        return resolve({ status: "Input Too Large" });
+      }
 
+      let normalizedInput = input.trim();
+
+      if (!normalizedInput.includes("\n")) {
+        normalizedInput = normalizedInput.split(/\s+/).join("\n");
+      }
+
+      normalizedInput += "\n";
+
+      run.stdin.write(normalizedInput);
+      run.stdin.end();
+    } else {
+      run.stdin.end();
+    }
+
+    // 📤 Capture stdout (with limit)
     run.stdout.on("data", (data) => {
+      if (stdout.length > 10000) {
+        run.kill("SIGKILL");
+        stdout = "Output Limit Exceeded";
+        return;
+      }
       stdout += data.toString();
     });
 
+    // ⚠️ Capture stderr
     run.stderr.on("data", (data) => {
       stderr += data.toString();
     });
 
-    run.on("close", () => {
+    // ✅ Process finished
+    run.on("close", (code) => {
       if (finished) return;
       finished = true;
 
       clearTimeout(timeout);
       cleanup();
 
-      if (stderr) {
+      if (code !== 0) {
         return resolve({
           status: "Runtime Error",
-          error: stderr
+          error: stderr || "Non-zero exit code"
         });
       }
 
       return resolve({
         status: "Success",
-        output: stdout
+        output: stdout.trim()
       });
     });
 
+    // ❌ Spawn error
     run.on("error", (err) => {
       if (finished) return;
       finished = true;
@@ -95,10 +126,11 @@ async function runPython(code, input) {
       });
     });
 
+    // 🧹 Cleanup
     function cleanup() {
       try {
         fs.rmSync(dir, { recursive: true, force: true });
-      } catch { }
+      } catch {}
     }
   });
 }

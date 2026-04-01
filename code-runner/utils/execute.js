@@ -7,7 +7,6 @@ exports.execute = (code, extension, runCommandBuilder, input = "", timeoutMs = 3
   return new Promise((resolve) => {
     const id = randomUUID();
     const tempDir = path.join(__dirname, "..", "temp", id);
-    console.log("excuting");
 
     fs.mkdirSync(tempDir, { recursive: true });
     const fileName = `Main.${extension}`;
@@ -21,14 +20,30 @@ exports.execute = (code, extension, runCommandBuilder, input = "", timeoutMs = 3
 
     let stdout = "";
     let stderr = "";
+    let finished = false;
 
+    // ✅ Normalize input
     if (input) {
-      process.stdin.write(input);
-      process.stdin.end();
+      let normalizedInput = input.trim();
+
+      if (!normalizedInput.includes("\n")) {
+        normalizedInput = normalizedInput.split(/\s+/).join("\n");
+      }
+
+      normalizedInput += "\n";
+      process.stdin.write(normalizedInput);
     }
 
-    process.stdout.on("data", data => stdout += data.toString());
-    process.stderr.on("data", data => stderr += data.toString());
+    // ✅ Always end stdin
+    process.stdin.end();
+
+    process.stdout.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    process.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
 
     const cleanup = () => {
       if (fs.existsSync(tempDir)) {
@@ -36,9 +51,14 @@ exports.execute = (code, extension, runCommandBuilder, input = "", timeoutMs = 3
       }
     };
 
+    // ⏱ Timeout
     const timer = setTimeout(() => {
+      if (finished) return;
+      finished = true;
+
       process.kill("SIGKILL");
       cleanup();
+
       resolve({
         status: "TLE",
         stdout: "",
@@ -47,10 +67,14 @@ exports.execute = (code, extension, runCommandBuilder, input = "", timeoutMs = 3
       });
     }, timeoutMs);
 
-    process.on("close", code => {
+    process.on("close", (code) => {
+      if (finished) return;
+      finished = true;
+
       clearTimeout(timer);
       const end = Date.now();
       const time = (end - start) / 1000;
+
       cleanup();
 
       if (code !== 0) {
@@ -60,9 +84,13 @@ exports.execute = (code, extension, runCommandBuilder, input = "", timeoutMs = 3
       resolve({ status: "Accepted", stdout, stderr, time });
     });
 
-    process.on("error", err => {
+    process.on("error", (err) => {
+      if (finished) return;
+      finished = true;
+
       clearTimeout(timer);
       cleanup();
+
       resolve({ status: "Runtime Error", stdout, stderr: err.message, time: 0 });
     });
   });
