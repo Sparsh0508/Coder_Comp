@@ -1,35 +1,81 @@
 const redis = require("../../config/redis");
 const matchService = require("./match.service");
+const matchmaking = require("./matchmaking.service");
 const { REDIS_KEYS } = require("./match.constants");
 
 module.exports = (io) => {
   io.on("connection", (socket) => {
-    const userId = socket.user.id; // from auth middleware
+    const userId = socket.user.id;
+
+    console.log("User connected:", userId);
 
     socket.on("join_queue", async () => {
-      console.log("JOIN QUEUE:", userId);
+  console.log("JOIN QUEUE:", userId);
 
-      await redis.rpush(REDIS_KEYS.QUEUE_1V1, userId);
+  await matchmaking.addToQueue(userId, socket.id);
 
-      const queueSize = await redis.llen(REDIS_KEYS.QUEUE_1V1);
-      console.log("Queue size:", queueSize);
+  // 🔥 ALWAYS check queue size
+  const queueSize = await redis.llen(REDIS_KEYS.QUEUE_1V1);
 
-      if (queueSize >= 2) {
-        const p1 = await redis.lpop(REDIS_KEYS.QUEUE_1V1);
-        const p2 = await redis.lpop(REDIS_KEYS.QUEUE_1V1);
+  if (queueSize < 2) {
+    // wait for opponent
+    return;
+  }
 
-        if (!p1 || !p2 || p1 === p2) return;
+  // 🔒 LOCK (only for matching part)
+  const lock = await redis.set(
+    REDIS_KEYS.MATCH_LOCK,
+    "1",
+    "NX",
+    "EX",
+    2
+  );
 
-        const matchId = await matchService.createMatch(p1, p2);
+  if (!lock) return;
 
-        const room = `match_${matchId}`;
-        socket.join(room);
+  const players = await matchmaking.popPlayers();
+  if (!players) return;
 
-        io.to(room).emit("match_found", { matchId, p1, p2 });
+  const { player1, player2 } = players;
 
-        await matchService.startMatch(matchId);
-        io.to(room).emit("match_start", { matchId });
+  console.log("🔥 MATCHING:", player1.userId, player2.userId);
+
+  const matchId = await matchService.createMatch(
+    player1.userId,
+    player2.userId
+  );
+
+  const room = `match_${matchId}`;
+
+  io.sockets.sockets.get(player1.socketId)?.join(room);
+  io.sockets.sockets.get(player2.socketId)?.join(room);
+
+  io.to(room).emit("match_found", {
+    matchId,
+    players: [player1.userId, player2.userId],
+  });
+
+  await matchService.startMatch(matchId);
+
+  io.to(room).emit("match_start", { matchId });
+});
+
+    socket.on("leave_queue", async () => {
+      const queue = await redis.lrange(REDIS_KEYS.QUEUE_1V1, 0, -1);
+
+      const filtered = queue.filter(
+        (u) => JSON.parse(u).userId !== userId
+      );
+
+      await redis.del(REDIS_KEYS.QUEUE_1V1);
+
+      if (filtered.length) {
+        await redis.rpush(REDIS_KEYS.QUEUE_1V1, ...filtered);
       }
+    });
+
+    socket.on("disconnect", () => {
+      console.log("Disconnected:", userId);
     });
   });
 };

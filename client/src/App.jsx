@@ -6,6 +6,8 @@ import Signup from './components/Auth/Signup'
 import DashBoard from './pages/DashBoard'
 import CodeEditor from './pages/CodeEditor'
 import Problem from './pages/Problem'
+import Matchmaking from './pages/Matchmaking'
+import MatchRoom from './pages/MatchRoom'
 
 
 // User Dashboard Component
@@ -73,8 +75,8 @@ function App() {
     <Router>
       <AuthProvider>
         <Routes>
-          <Route path="/code" element={<CodeEditor />} />
-          <Route path="/problem" element={<Problem />} />
+          {/* <Route path="/editor/:id" element={<Problem  />} /> */}
+          <Route path="/problem/:id" element={<Problem />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
 
@@ -92,6 +94,8 @@ function App() {
 
           <Route path="/" element={<RootRedirect />} />
           <Route path="*" element={<Navigate to="/" />} />
+           <Route path="/matchmaking" element={<Matchmaking />} />
+        <Route path="/match/:id" element={<MatchRoom />} />
         </Routes>
       </AuthProvider>
     </Router>

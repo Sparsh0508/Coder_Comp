@@ -1,39 +1,78 @@
 import { useState, useEffect } from "react";
 import api from "../utils/api";
+import { socket } from "../socket";
+import { useNavigate } from "react-router-dom";
 
 const DashBoard = () => {
   const [user, setUser] = useState(null);
   const [stats, setStats] = useState(null);
   const [matches, setMatches] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const navigate = useNavigate();
+
   useEffect(() => {
     fetchDashBoard();
   }, []);
 
+  // 🔥 SOCKET LOGIC
+  useEffect(() => {
+  if (!user) return;
+
+  socket.auth = { userId: user.id };
+
+  // ✅ prevent multiple connections
+  if (!socket.connected) {
+    socket.connect();
+  }
+
+  socket.on("match_found", ({ matchId }) => {
+    setSearching(false);
+    setMessage("");
+    navigate(`/match/${matchId}`);
+  });
+
+  socket.on("no_match_found", () => {
+    setSearching(false);
+    setMessage("❌ No opponent found. Try again.");
+  });
+
+  return () => {
+    socket.off("match_found");
+    socket.off("no_match_found");
+  };
+}, [user]);
+
+  // ▶️ PLAY
+  const handlePlay = () => {
+    console.log("CLICKED PLAY"); // 👈 add this
+  console.log("Socket connected:", socket.connected);
+  if (!socket.connected) {
+    socket.connect();
+
+    socket.once("connect", () => {
+      socket.emit("join_queue");
+    });
+  } else {
+    socket.emit("join_queue");
+  }
+
+  setSearching(true);
+  setMessage("");
+  };
+
+  // ❌ CANCEL
+  const handleCancel = () => {
+    setSearching(false);
+    socket.emit("leave_queue");
+  };
+
   const fetchDashBoard = async () => {
     try {
-      const res = await api.get("/dashboard")
-      // const res = {
-      //   user: {
-      //     username: "Rudra",
-      //     rank: "Gold II",
-      //     rating: 1450,
-      //   },
-      //   stats: {
-      //     total: 50,
-      //     wins: 30,
-      //     winRate: 60,
-      //     streak: 3,
-      //   },
-      //   recentMatches: [
-      //     { id: 1, opponent: "Aman", result: "WIN" },
-      //     { id: 2, opponent: "Rohit", result: "LOSS" },
-      //   ],
-      //   leaderboard: [
-      //     { id: 1, username: "ProGamer", rating: 2000 },
-      //     { id: 2, username: "Shadow", rating: 1800 },
-      //   ],
-      // };
+      const res = await api.get("/dashboard");
+
       setUser(res.data.user);
       setStats(res.data.stats);
       setMatches(res.data.recentMatches);
@@ -41,7 +80,8 @@ const DashBoard = () => {
     } catch (error) {
       console.error("Dashboard fetch failed");
     }
-  }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#020617] to-black text-white p-6 space-y-6">
 
@@ -61,12 +101,34 @@ const DashBoard = () => {
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 flex flex-col justify-center items-center shadow-lg shadow-blue-500/20">
           <h2 className="text-xl font-semibold mb-3">Ready to battle?</h2>
 
-          <button className="bg-white text-blue-600 px-6 py-2 rounded-xl font-bold hover:scale-105 transition">
-            Play 1v1 ⚔️
-          </button>
+          {!searching ? (
+            <button
+              onClick={handlePlay}
+              className="bg-white text-blue-600 px-6 py-2 rounded-xl font-bold hover:scale-105 transition"
+            >
+              Play 1v1 ⚔️
+            </button>
+          ) : (
+            <>
+              <p className="mb-3 animate-pulse">🔍 Searching opponent...</p>
+              <button
+                onClick={handleCancel}
+                className="bg-red-500 px-5 py-2 rounded-xl font-bold"
+              >
+                Cancel
+              </button>
+            </>
+          )}
+
+          {/* 🔴 MESSAGE */}
+          {message && (
+            <p className="mt-3 text-red-400 text-sm text-center">
+              {message}
+            </p>
+          )}
         </div>
 
-        {/* STATS CARD */}
+        {/* STATS */}
         <div className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-5 space-y-1">
           <p>Total Matches: <span className="text-blue-400">{stats?.total}</span></p>
           <p>Wins: <span className="text-green-400">{stats?.wins}</span></p>
@@ -88,10 +150,6 @@ const DashBoard = () => {
               <span className="text-yellow-400">{player.rating}</span>
             </div>
           ))}
-
-          <button className="mt-4 text-sm text-blue-400 hover:underline">
-            View Full Leaderboard →
-          </button>
         </div>
 
         {/* MATCHES */}
@@ -117,5 +175,6 @@ const DashBoard = () => {
       </div>
     </div>
   );
-}
+};
+
 export default DashBoard;
