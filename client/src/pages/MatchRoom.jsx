@@ -9,54 +9,34 @@ const MatchRoom = () => {
   const navigate = useNavigate();
 
   const [players, setPlayers] = useState(location.state?.players || []);
-
-  // 🔥 keep latest players (important)
   const playersRef = useRef(players);
 
+  // Keep ref updated
   useEffect(() => {
     playersRef.current = players;
   }, [players]);
 
   useEffect(() => {
-    // fallback for refresh
-    if (!players.length) {
-      socket.on("match_found", (data) => {
-        if (String(data.matchId) === String(id)) {
-          setPlayers(data.players);
-        }
-      });
-    }
+    console.log("📡 Joining room:", id);
 
-    // 🚀 MATCH START
-    socket.on("match_start", ({ matchId }) => {
-      console.log("MATCH START RECEIVED:", matchId);
+    socket.emit("join_room", { matchId: id });
+
+    const handleMatchStart = ({ matchId }) => {
+      console.log("🔥 MATCH START RECEIVED:", matchId);
 
       if (String(matchId) === String(id)) {
-        const currentPlayers = playersRef.current;
-
-        // ✅ ensure players exist
-        if (currentPlayers.length) {
-          navigate(`/problem/${matchId}`, {
-            state: { players: currentPlayers }
-          });
-        } else {
-          console.log("⚠️ Players not ready, delaying...");
-
-          // fallback delay
-          setTimeout(() => {
-            navigate(`/problem/${matchId}`, {
-              state: { players: playersRef.current }
-            });
-          }, 500);
-        }
+        navigate(`/problem/${matchId}`, {
+          state: { players: playersRef.current },
+        });
       }
-    });
+    };
+
+    socket.on("match_start", handleMatchStart);
 
     return () => {
-      socket.off("match_found");
-      socket.off("match_start");
+      socket.off("match_start", handleMatchStart);
     };
-  }, [id]);
+  }, [id, navigate]);
 
   const leftPlayer = players[0];
   const rightPlayer = players[1];

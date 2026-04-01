@@ -1,25 +1,32 @@
 import { useEffect } from "react";
-import { socket } from "../socket";
 import { useNavigate } from "react-router-dom";
+import { socket } from "../socket";
 
 const Matchmaking = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // 🔥 Join queue
     socket.emit("join_queue");
 
-    socket.on("match_found", ({ matchId }) => {
-      navigate(`/match/${matchId}`);
-    });
+    const handleMatchFound = (data) => {
+      console.log("🔥 MATCH FOUND:", data);
 
-    return () => socket.off("match_found");
-  }, []);
+      navigate(`/room/${data.matchId}`, {
+        state: { players: data.players },
+      });
+    };
+
+    socket.on("match_found", handleMatchFound);
+
+    return () => {
+      socket.off("match_found", handleMatchFound);
+    };
+  }, [navigate]);
 
   return (
-    <div className="h-screen flex items-center justify-center bg-black text-white">
-      <h1 className="text-xl animate-pulse">
-        🔍 Finding opponent...
-      </h1>
+    <div className="h-screen flex items-center justify-center bg-gray-900 text-white">
+      <h1 className="text-2xl animate-pulse">🔍 Finding Match...</h1>
     </div>
   );
 };

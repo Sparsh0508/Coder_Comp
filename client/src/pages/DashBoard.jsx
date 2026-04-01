@@ -17,13 +17,12 @@ const DashBoard = () => {
     fetchDashBoard();
   }, []);
 
-  // 🔥 SOCKET LOGIC
   useEffect(() => {
   if (!user) return;
 
   socket.auth = { userId: user.id };
 
-  // ✅ prevent multiple connections
+ 
   if (!socket.connected) {
     socket.connect();
   }
@@ -45,9 +44,9 @@ const DashBoard = () => {
   };
 }, [user]);
 
-  // ▶️ PLAY
+
   const handlePlay = () => {
-    console.log("CLICKED PLAY"); // 👈 add this
+    console.log("CLICKED PLAY"); 
   console.log("Socket connected:", socket.connected);
   if (!socket.connected) {
     socket.connect();
@@ -63,7 +62,7 @@ const DashBoard = () => {
   setMessage("");
   };
 
-  // ❌ CANCEL
+ 
   const handleCancel = () => {
     setSearching(false);
     socket.emit("leave_queue");
