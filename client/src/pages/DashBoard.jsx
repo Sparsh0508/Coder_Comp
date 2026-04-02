@@ -27,11 +27,18 @@ const DashBoard = () => {
     socket.connect();
   }
 
-  socket.on("match_found", ({ matchId }) => {
-    setSearching(false);
-    setMessage("");
-    navigate(`/match/${matchId}`);
+socket.on("match_found", (data) => {
+  console.log("Socket players:", data);
+  console.log("Socket playersName:", data.playersNames);
+
+  navigate(`/match/${data.matchId}`, {
+    state: {
+      players: data.players,
+      playersNames: data.playersNames
+    }
   });
+});
+
 
   socket.on("no_match_found", () => {
     setSearching(false);

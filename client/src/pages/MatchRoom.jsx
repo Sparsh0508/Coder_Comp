@@ -9,7 +9,9 @@ const MatchRoom = () => {
   const navigate = useNavigate();
 
   const [players, setPlayers] = useState(location.state?.players || []);
+  const [playersNames, setPlayersNames] = useState(location.state?.playersNames || []);
   const playersRef = useRef(players);
+  const playersNamesRef = useRef(playersNames);
 
   // Keep ref updated
   useEffect(() => {
@@ -26,7 +28,7 @@ const MatchRoom = () => {
 
       if (String(matchId) === String(id)) {
         navigate(`/problem/${matchId}`, {
-          state: { players: playersRef.current },
+          state: { players: playersRef.current, playersNames: playersNamesRef.current },
         });
       }
     };

@@ -5,34 +5,41 @@ const { runPython } = require("./runners/python");
 const { runCpp } = require("./runners/cpp");
 const { runJava } = require("./runners/java");
 const { judge } = require("./judge/judge");
-// const { runJS } = require("./runners/javascript");
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
+//////////////////////////////////////////////////////////
 // 🔥 Get Runner
+//////////////////////////////////////////////////////////
 function getRunner(language) {
   if (language === "python") return runPython;
   if (language === "cpp") return runCpp;
   if (language === "java") return runJava;
-  
   return null;
 }
 
-// 🔥 Normalize Input (FIX YOUR ERROR)
+//////////////////////////////////////////////////////////
+// 🔥 Normalize Input (ONLY ONCE)
+//////////////////////////////////////////////////////////
 function normalizeInput(input) {
   if (typeof input === "object") {
-    const nums = JSON.parse(input.nums).join(" ");
-    const target = input.target;
-    return `${nums}\n${target}`;
+    return {
+      nums: JSON.parse(input.nums),
+      target: Number(input.target),
+    };
   }
   return input;
 }
 
+//////////////////////////////////////////////////////////
+// 🔥 WRAPPERS (NO STDIN NEEDED)
+//////////////////////////////////////////////////////////
+
 function wrapJava(code, input) {
-  const nums = JSON.parse(input.nums).join(",");
+  const nums = input.nums.join(",");
   const target = input.target;
 
   return `
@@ -55,13 +62,15 @@ public class Main {
             if (i != res.length - 1) System.out.print(", ");
         }
         System.out.print("]");
+
+        System.out.flush();   // ✅ IMPORTANT
+        System.exit(0);       // ✅ FORCE EXIT
     }
 }
 `;
 }
-
 function wrapCpp(code, input) {
-  const nums = JSON.parse(input.nums).join(",");
+  const nums = input.nums.join(",");
   const target = input.target;
 
   return `
@@ -87,7 +96,7 @@ int main() {
 }
 
 function wrapPython(code, input) {
-  const nums = input.nums;
+  const nums = JSON.stringify(input.nums);
   const target = input.target;
 
   return `
@@ -101,7 +110,7 @@ if __name__ == "__main__":
 }
 
 function wrapJS(code, input) {
-  const nums = input.nums;
+  const nums = JSON.stringify(input.nums);
   const target = input.target;
 
   return `
@@ -120,8 +129,6 @@ console.log(solve(nums, target));
 
 app.post("/api/run", async (req, res) => {
   const { language, code, input } = req.body;
-  console.log(req.body);
-  
 
   const runner = getRunner(language);
   if (!runner) {
@@ -129,34 +136,35 @@ app.post("/api/run", async (req, res) => {
   }
 
   try {
-    // 🔥 Normalize input FIRST
+    // ✅ Normalize once
     const normalizedInput = normalizeInput(input);
 
     let finalCode = code;
 
-    // 🔥 Wrap code
+    // ✅ Wrap based on language
     if (language === "java") {
-      finalCode = wrapJava(code, input);
+      finalCode = wrapJava(code, normalizedInput);
     } else if (language === "cpp") {
-      finalCode = wrapCpp(code, input);
+      finalCode = wrapCpp(code, normalizedInput);
     } else if (language === "python") {
-      finalCode = wrapPython(code, input);
+      finalCode = wrapPython(code, normalizedInput);
     } else if (language === "javascript") {
-      finalCode = wrapJS(code, input);
+      finalCode = wrapJS(code, normalizedInput);
     }
 
-    const result = await runner(finalCode, normalizedInput);
+    // ✅ NO INPUT PASSED (wrapper handles it)
+    const result = await runner(finalCode);
 
     return res.json({
       output: result.output || "",
-      status: result.status
+      status: result.status,
     });
 
   } catch (err) {
-    console.log(err);
+    console.error(err);
     return res.json({
       output: "",
-      status: "Runtime Error"
+      status: "Runtime Error",
     });
   }
 });
@@ -167,54 +175,59 @@ app.post("/api/run", async (req, res) => {
 
 app.post("/api/submit", async (req, res) => {
   const { language, code } = req.body;
-  console.log(req.body);
-
 
   const runner = getRunner(language);
 
-  // 🔥 Problem definition
   const problem = {
     timeLimit: 3000,
-
     testcases: [
       {
         input: { nums: "[2,7,11,15]", target: "9" },
         output: "[0, 1]",
-        hidden: false
+        hidden: false,
       },
       {
         input: { nums: "[3,2,4]", target: "6" },
         output: "[1, 2]",
-        hidden: false
+        hidden: false,
       },
       {
         input: { nums: "[3,3]", target: "6" },
         output: "[0, 1]",
-        hidden: true // 🔥 hidden testcase
-      }
-    ]
+        hidden: true,
+      },
+    ],
   };
 
-  const result = await judge({
-    code,
-    language,
-    testcases: problem.testcases,
-    runner,
-    timeLimit: problem.timeLimit
-  });
+  try {
+    const result = await judge({
+      code,
+      language,
+      testcases: problem.testcases,
+      runner,
+      timeLimit: problem.timeLimit,
+    });
 
-  // 🔥 Hide hidden testcases
-  const visibleResults = result.results.map((r, i) => ({
-    ...r,
-    input: problem.testcases[i].hidden ? "Hidden" : r.input
-  }));
+    const visibleResults = result.results.map((r, i) => ({
+      ...r,
+      input: problem.testcases[i].hidden ? "Hidden" : r.input,
+    }));
 
-  res.json({
-    status: result.status,
-    failedCase: result.failedCase,
-    results: visibleResults
-  });
+    res.json({
+      status: result.status,
+      failedCase: result.failedCase,
+      results: visibleResults,
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.json({
+      status: "Error",
+      results: [],
+    });
+  }
 });
+
 //////////////////////////////////////////////////////////
 
 app.listen(5001, () => {

@@ -158,6 +158,7 @@ const { id } = useParams();
       });
 
       const data = await res.json();
+      console.log("Run response:", data);
       setOutput(data.output || "No output");
     } catch {
       setOutput("❌ Server Error");

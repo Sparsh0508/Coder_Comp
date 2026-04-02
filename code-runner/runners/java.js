@@ -3,10 +3,12 @@ const path = require("path");
 const { spawn } = require("child_process");
 const { v4: uuid } = require("uuid");
 
-async function runJava(code, input = "") {
+async function runJava(code) {
   return new Promise((resolve) => {
     const id = uuid();
     const dir = path.join(__dirname, "temp", id);
+
+    // ✅ Create temp directory
     fs.mkdirSync(dir, { recursive: true });
 
     const filePath = path.join(dir, "Main.java");
@@ -33,11 +35,7 @@ async function runJava(code, input = "") {
     let stdout = "";
     let stderr = "";
 
-   
-    if (input) {
-      run.stdin.write(input);
-    }
-    run.stdin.end();
+    // ❌ REMOVED stdin.write (NO INPUT NEEDED WITH WRAPPER)
 
     run.stdout.on("data", (data) => {
       stdout += data.toString();
@@ -48,13 +46,19 @@ async function runJava(code, input = "") {
     });
 
     const cleanup = () => {
-      fs.rmSync(dir, { recursive: true, force: true });
+      try {
+        fs.rmSync(dir, { recursive: true, force: true });
+      } catch (e) {}
     };
 
+    // ⏱️ Timeout protection (TLE)
     const timeout = setTimeout(() => {
       run.kill("SIGKILL");
       cleanup();
-      resolve({ status: "TLE", output: "" });
+      resolve({
+        status: "TLE",
+        output: ""
+      });
     }, 5000);
 
     run.on("close", (code) => {
@@ -70,7 +74,7 @@ async function runJava(code, input = "") {
 
       resolve({
         status: "Success",
-        output: stdout.trim()   
+        output: stdout.trim()
       });
     });
   });

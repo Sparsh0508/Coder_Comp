@@ -75,7 +75,7 @@ function App() {
     <Router>
       <AuthProvider>
         <Routes>
-          {/* <Route path="/editor/:id" element={<Problem  />} /> */}
+          {/* <Route path="/editor/:id" element={<Problem  />} />  */}
           <Route path="/problem/:id" element={<Problem />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
@@ -95,7 +95,7 @@ function App() {
           <Route path="/" element={<RootRedirect />} />
           <Route path="*" element={<Navigate to="/" />} />
            <Route path="/matchmaking" element={<Matchmaking />} />
-        <Route path="/match/:id" element={<MatchRoom />} />
+          <Route path="/match/:id" element={<MatchRoom />} />
         </Routes>
       </AuthProvider>
     </Router>
