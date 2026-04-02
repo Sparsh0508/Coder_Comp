@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import Prism from "prismjs";
 import "prismjs/components/index";
 import "prismjs/themes/prism-tomorrow.css";
+import { socket } from "../socket";
+import { useNavigate, useParams } from "react-router-dom";
 
 const CodeEditor = () => {
   // 🔥 LeetCode-style boilerplates
@@ -36,7 +38,8 @@ const CodeEditor = () => {
   const [loadingSubmit, setLoadingSubmit] = useState(false);
 
   const [activeTab, setActiveTab] = useState("testcase");
-
+const navigate = useNavigate();
+const { id } = useParams();
   // 🔥 Structured Testcases
   const [testcases, setTestcases] = useState([
     { nums: "[2,7,11,15]", target: "9" }
@@ -75,6 +78,23 @@ const CodeEditor = () => {
     setCode(savedCodes[language] || boilerplates[language]);
   }, [language]);
 
+  useEffect(() => {
+  socket.on("match_result", ({ winner }) => {
+    console.log("🏆 WINNER:", winner);
+
+    if (winner === socket.userId) {
+      alert("🎉 You Won!");
+    } else {
+      alert("😢 You Lost!");
+    }
+
+    navigate("/dashboard"); // or result page
+  });
+
+  return () => {
+    socket.off("match_result");
+  };
+}, []);
   // ✏️ Typing
   const handleChange = (e) => {
     const value = e.target.value;
@@ -168,14 +188,27 @@ const CodeEditor = () => {
       const data = await res.json();
 
       if (data.status === "Accepted") {
-        setOutput("✅ Accepted 🎉");
-      } else if (data.status === "Wrong Answer") {
-        setOutput(
-          `❌ Wrong Answer\n\nExpected: ${data.expected}\nGot: ${data.got}`
-        );
-      } else {
-        setOutput(`⚠️ ${data.status}`);
-      }
+  setOutput("✅ Accepted 🎉");
+   socket.emit("submit_success", {
+    matchId: id,          // from useParams()
+    userId: socket.userId
+  });
+} else {
+  let msg = `❌ ${data.status}\n\n`;
+
+  data.results.forEach((r) => {
+    msg += `Case ${r.case}: ${r.verdict}\n`;
+
+    if (r.verdict !== "Accepted") {
+      msg += `Expected: ${r.expected}\n`;
+      msg += `Got: ${r.output}\n`;
+    }
+
+    msg += "\n";
+  });
+
+  setOutput(msg);
+}
     } catch {
       setOutput("❌ Server Error");
     }

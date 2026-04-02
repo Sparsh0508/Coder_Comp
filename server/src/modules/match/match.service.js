@@ -33,10 +33,26 @@ const getMatchById = async (matchId) => {
   const [rows] = await db.query(`SELECT * FROM matches WHERE id = ?`, [matchId]);
   return rows[0];
 };
+async function setWinner(matchId, userId) {
+  await db.query(
+    "UPDATE matches SET winner = ?, status = 'finished' WHERE id = ?",
+    [userId, matchId]
+  );
+}
+
+async function getMatch(matchId) {
+  const [rows] = await db.query(
+    "SELECT * FROM matches WHERE id = ?",
+    [matchId]
+  );
+  return rows[0];
+}
 
 module.exports = {
   createMatch,
   startMatch,
   finishMatch,
-  getMatchById
+  getMatchById,
+  setWinner,
+  getMatch
 };

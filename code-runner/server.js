@@ -4,6 +4,7 @@ const cors = require("cors");
 const { runPython } = require("./runners/python");
 const { runCpp } = require("./runners/cpp");
 const { runJava } = require("./runners/java");
+const { judge } = require("./judge/judge");
 // const { runJS } = require("./runners/javascript");
 
 const app = express();
@@ -29,10 +30,6 @@ function normalizeInput(input) {
   }
   return input;
 }
-
-//////////////////////////////////////////////////////////
-// 🔥 WRAPPERS (CORE LOGIC)
-//////////////////////////////////////////////////////////
 
 function wrapJava(code, input) {
   const nums = JSON.parse(input.nums).join(",");
@@ -123,6 +120,8 @@ console.log(solve(nums, target));
 
 app.post("/api/run", async (req, res) => {
   const { language, code, input } = req.body;
+  console.log(req.body);
+  
 
   const runner = getRunner(language);
   if (!runner) {
@@ -168,49 +167,54 @@ app.post("/api/run", async (req, res) => {
 
 app.post("/api/submit", async (req, res) => {
   const { language, code } = req.body;
+  console.log(req.body);
+
 
   const runner = getRunner(language);
 
-  const testCases = [
-    { input: { nums: "[2,7,11,15]", target: "9" }, output: "[0, 1]" },
-    { input: { nums: "[3,2,4]", target: "6" }, output: "[1, 2]" },
-    { input: { nums: "[3,3]", target: "6" }, output: "[0, 1]" }
-  ];
+  // 🔥 Problem definition
+  const problem = {
+    timeLimit: 3000,
 
-  for (let i = 0; i < testCases.length; i++) {
-    const test = testCases[i];
+    testcases: [
+      {
+        input: { nums: "[2,7,11,15]", target: "9" },
+        output: "[0, 1]",
+        hidden: false
+      },
+      {
+        input: { nums: "[3,2,4]", target: "6" },
+        output: "[1, 2]",
+        hidden: false
+      },
+      {
+        input: { nums: "[3,3]", target: "6" },
+        output: "[0, 1]",
+        hidden: true // 🔥 hidden testcase
+      }
+    ]
+  };
 
-    let finalCode = code;
+  const result = await judge({
+    code,
+    language,
+    testcases: problem.testcases,
+    runner,
+    timeLimit: problem.timeLimit
+  });
 
-    if (language === "java") finalCode = wrapJava(code, test.input);
-    if (language === "cpp") finalCode = wrapCpp(code, test.input);
-    if (language === "python") finalCode = wrapPython(code, test.input);
-    if (language === "javascript") finalCode = wrapJS(code, test.input);
+  // 🔥 Hide hidden testcases
+  const visibleResults = result.results.map((r, i) => ({
+    ...r,
+    input: problem.testcases[i].hidden ? "Hidden" : r.input
+  }));
 
-    const normalizedInput = normalizeInput(test.input);
-
-    const result = await runner(finalCode, normalizedInput);
-
-    if (result.status !== "Success" && result.status !== "Accepted") {
-      return res.json({
-        status: result.status,
-        failedCase: i + 1
-      });
-    }
-
-    if ((result.output || "").trim() !== test.output.trim()) {
-      return res.json({
-        status: "Wrong Answer",
-        failedCase: i + 1,
-        expected: test.output,
-        got: result.output
-      });
-    }
-  }
-
-  return res.json({ status: "Accepted" });
+  res.json({
+    status: result.status,
+    failedCase: result.failedCase,
+    results: visibleResults
+  });
 });
-
 //////////////////////////////////////////////////////////
 
 app.listen(5001, () => {

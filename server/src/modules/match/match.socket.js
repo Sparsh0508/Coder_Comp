@@ -69,7 +69,26 @@ module.exports = (io) => {
         io.to(room).emit("match_start", { matchId });
       }, 2000);
     });
+    socket.on("submit_success", async ({ matchId, userId }) => {
+  const room = `match_${matchId}`;
 
+  console.log("✅ Submission success from:", userId);
+
+  const match = await matchService.getMatch(matchId);
+
+  // 🛑 prevent duplicate winner
+  if (match.winner) return;
+
+  // 🏆 set winner
+  await matchService.setWinner(matchId, userId);
+
+  console.log("🏆 WINNER:", userId);
+
+  // 🔥 notify both players
+  io.to(room).emit("match_result", {
+    winner: userId
+  });
+});
     // ❌ LEAVE QUEUE
     socket.on("leave_queue", async () => {
       const queue = await redis.lrange(REDIS_KEYS.QUEUE_1V1, 0, -1);
