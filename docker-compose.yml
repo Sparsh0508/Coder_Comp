@@ -14,6 +14,7 @@ services:
       - ./server/.env
     depends_on:
       - mongo
+      - code-runner
     ports:
       - "8080:8080"
 
@@ -26,6 +27,12 @@ services:
       - server
     ports:
       - "4173:4173"
+
+  code-runner:
+    build:
+      context: ./code-runner
+    ports:
+      - "5001:5001"
 
 volumes:
   mongo_data:

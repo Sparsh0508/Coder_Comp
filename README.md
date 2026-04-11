@@ -8,7 +8,7 @@ CodeCamp Arena is a production-structured realtime two-player coding competition
 - Backend: Node.js + Express + Socket.IO
 - Database: MongoDB + Mongoose
 - Auth: JWT in HTTP-only cookies + bcrypt password hashing
-- Code execution: Judge0 API integration
+- Code execution: local Docker-based sandbox service
 
 ## Folder structure
 
@@ -35,7 +35,7 @@ server/
 - Socket.IO matchmaking queue with `joinQueue`, `matchFound`, `startMatch`, `codeUpdate`, `submissionResult`, `matchEnd`
 - Split-screen coding UI with Monaco editor, language selection, countdown timer, and realtime opponent panel
 - Mongo-backed problem bank with starter code, sample tests, and hidden tests
-- Run and submit flows backed by Judge0
+- Run and submit flows backed by the in-repo `code-runner` service
 - Automatic winner selection and ELO-style leaderboard updates
 
 ## Local setup
@@ -60,8 +60,7 @@ Required backend values:
 
 - `MONGODB_URI`: Mongo database connection string
 - `JWT_SECRET`: long random signing secret
-- `JUDGE0_URL`: Judge0 API base URL
-- `JUDGE0_API_KEY`: optional auth token if your Judge0 deployment requires one
+- `CODE_RUNNER_URL`: local execution service URL for the in-repo sandbox runner
 
 ### 3. Seed sample problems
 
@@ -75,11 +74,19 @@ npm run seed
 In one terminal:
 
 ```bash
+cd code-runner
+npm install
+npm start
+```
+
+In a second terminal:
+
+```bash
 cd server
 npm run dev
 ```
 
-In a second terminal:
+In a third terminal:
 
 ```bash
 cd client
@@ -111,5 +118,3 @@ A lightweight compose setup is included for local containers.
 ```bash
 docker compose up --build
 ```
-
-Make sure your `server/.env` contains a reachable `JUDGE0_URL`, since Judge0 is configured as an external service in this repo.

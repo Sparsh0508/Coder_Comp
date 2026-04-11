@@ -23,6 +23,18 @@ function getRunner(language) {
   return null;
 }
 
+function normalizeTextInput(input) {
+  if (input === null || input === undefined) {
+    return "";
+  }
+
+  if (typeof input === "string") {
+    return input;
+  }
+
+  return JSON.stringify(input);
+}
+
 //////////////////////////////////////////////////////////
 // 🔥 Normalize Input (ONLY ONCE)
 //////////////////////////////////////////////////////////
@@ -187,6 +199,36 @@ app.post("/api/run", async (req, res) => {
       output: "",
       error: "Internal Server Error",
       status: "Runtime Error",
+    });
+  }
+});
+
+app.post("/api/execute", async (req, res) => {
+  const { language, code, stdin } = req.body;
+
+  const runner = getRunner(language);
+  if (!runner) {
+    return res.status(400).json({ error: "Unsupported language" });
+  }
+
+  try {
+    const result = await runner(code, normalizeTextInput(stdin));
+
+    return res.json({
+      status: result.status,
+      output: result.output || result.stdout || "",
+      error: result.error || result.stderr || "",
+      time: result.time || 0,
+      memory: 0,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      status: "Internal Error",
+      output: "",
+      error: "Internal Server Error",
+      time: 0,
+      memory: 0,
     });
   }
 });

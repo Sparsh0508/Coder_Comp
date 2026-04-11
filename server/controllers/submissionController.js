@@ -2,7 +2,7 @@ const Match = require("../models/Match");
 const Problem = require("../models/Problem");
 const Submission = require("../models/Submission");
 const User = require("../models/User");
-const { evaluateCode } = require("../utils/judge0");
+const { evaluateCode } = require("../utils/executor");
 const { calculateElo } = require("../utils/elo");
 
 function buildMatchSummary(match, winnerId) {

@@ -3,7 +3,7 @@ const path = require("path");
 const { spawn } = require("child_process");
 const { v4: uuid } = require("uuid");
 
-async function runJava(code) {
+async function runJava(code, input = "") {
   return new Promise((resolve) => {
     const id = uuid();
     const dir = path.join(__dirname, "temp", id);
@@ -35,7 +35,18 @@ async function runJava(code) {
     let stdout = "";
     let stderr = "";
 
-    // ❌ REMOVED stdin.write (NO INPUT NEEDED WITH WRAPPER)
+    if (input) {
+      let normalizedInput = input.trim();
+
+      if (!normalizedInput.includes("\n")) {
+        normalizedInput = normalizedInput.split(/\s+/).join("\n");
+      }
+
+      normalizedInput += "\n";
+      run.stdin.write(normalizedInput);
+    }
+
+    run.stdin.end();
 
     run.stdout.on("data", (data) => {
       stdout += data.toString();
