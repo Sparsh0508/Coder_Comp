@@ -1,10 +1,10 @@
 const db = require("../../config/db");
 
-const createMatch = async (p1, p2) => {
+const createMatch = async (p1, p2, problemId = null) => {
   const [res] = await db.query(
-    `INSERT INTO matches (player1_id, player2_id)
-     VALUES (?, ?)`,
-    [p1, p2]
+    `INSERT INTO matches (player1_id, player2_id, problem_id)
+     VALUES (?, ?, ?)`,
+    [p1, p2, problemId]
   );
   return res.insertId;
 };
@@ -35,7 +35,7 @@ const getMatchById = async (matchId) => {
 };
 async function setWinner(matchId, userId) {
   await db.query(
-    "UPDATE matches SET winner = ?, status = 'finished' WHERE id = ?",
+    "UPDATE matches SET winner_id = ?, status = 'FINISHED' WHERE id = ?",
     [userId, matchId]
   );
 }

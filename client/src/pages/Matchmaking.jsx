@@ -12,7 +12,7 @@ const Matchmaking = () => {
     const handleMatchFound = (data) => {
       console.log("🔥 MATCH FOUND:", data);
 
-      navigate(`/room/${data.matchId}`, {
+      navigate(`/match/${data.matchId}`, {
         state: { players: data.players },
       });
     };

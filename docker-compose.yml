@@ -1,0 +1,31 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  server:
+    build:
+      context: ./server
+    env_file:
+      - ./server/.env
+    depends_on:
+      - mongo
+    ports:
+      - "8080:8080"
+
+  client:
+    build:
+      context: ./client
+    env_file:
+      - ./client/.env
+    depends_on:
+      - server
+    ports:
+      - "4173:4173"
+
+volumes:
+  mongo_data:

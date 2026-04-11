@@ -4,6 +4,7 @@ import "prismjs/components/index";
 import "prismjs/themes/prism-tomorrow.css";
 import { socket } from "../socket";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const CodeEditor = () => {
   // 🔥 LeetCode-style boilerplates
@@ -40,11 +41,13 @@ const CodeEditor = () => {
   const [activeTab, setActiveTab] = useState("testcase");
 const navigate = useNavigate();
 const { id } = useParams();
+const { user } = useAuth();
   // 🔥 Structured Testcases
   const [testcases, setTestcases] = useState([
     { nums: "[2,7,11,15]", target: "9" }
   ]);
   const [activeCase, setActiveCase] = useState(0);
+  const [testResults, setTestResults] = useState([]);
 
   const codeRef = useRef(null);
   const textareaRef = useRef(null);
@@ -82,7 +85,7 @@ const { id } = useParams();
   socket.on("match_result", ({ winner }) => {
     console.log("🏆 WINNER:", winner);
 
-    if (winner === socket.userId) {
+    if (winner === user?.id) {
       alert("🎉 You Won!");
     } else {
       alert("😢 You Lost!");
@@ -143,8 +146,6 @@ const { id } = useParams();
     setActiveTab("result");
 
     try {
-      const current = testcases[activeCase];
-
       const res = await fetch("http://localhost:5001/api/run", {
         method: "POST",
         headers: {
@@ -153,14 +154,23 @@ const { id } = useParams();
         body: JSON.stringify({
           code,
           language,
-          input: current
+          inputs: testcases // 🔥 Send all cases!
         })
       });
 
       const data = await res.json();
       console.log("Run response:", data);
-      setOutput(data.output || "No output");
-    } catch {
+      
+      if (data.results) {
+        setTestResults(data.results);
+        setActiveCase(0);
+        setOutput(data.status === "Success" ? "⚡ Run Finished" : "❌ Error");
+      } else {
+        // Fallback for single run if things go south
+        setOutput(data.output || data.error || "No output");
+      }
+    } catch (err) {
+      console.error(err);
       setOutput("❌ Server Error");
     }
 
@@ -187,30 +197,20 @@ const { id } = useParams();
       });
 
       const data = await res.json();
+      setTestResults(data.results || []);
+      setActiveCase(0);
 
       if (data.status === "Accepted") {
-  setOutput("✅ Accepted 🎉");
-   socket.emit("submit_success", {
-    matchId: id,          // from useParams()
-    userId: socket.userId
-  });
-} else {
-  let msg = `❌ ${data.status}\n\n`;
-
-  data.results.forEach((r) => {
-    msg += `Case ${r.case}: ${r.verdict}\n`;
-
-    if (r.verdict !== "Accepted") {
-      msg += `Expected: ${r.expected}\n`;
-      msg += `Got: ${r.output}\n`;
-    }
-
-    msg += "\n";
-  });
-
-  setOutput(msg);
-}
-    } catch {
+        setOutput("✅ Accepted 🎉");
+        socket.emit("submit_success", {
+          matchId: id,
+          userId: user?.id
+        });
+      } else {
+        setOutput(`❌ ${data.status}`);
+      }
+    } catch (err) {
+      console.error(err);
       setOutput("❌ Server Error");
     }
 
@@ -373,9 +373,92 @@ const { id } = useParams();
 
           {/* RESULT */}
           {activeTab === "result" && (
-            <pre className="bg-black p-3 rounded text-sm h-full whitespace-pre-wrap">
-              {output}
-            </pre>
+            <div className="flex flex-col gap-4 h-full">
+              {/* Result Summary */}
+              <div className={`p-3 rounded-lg border ${
+                testResults.every(r => r.verdict === 'Accepted') 
+                ? 'bg-green-500/10 border-green-500/30 text-green-400' 
+                : 'bg-red-500/10 border-red-500/30 text-red-400'
+              }`}>
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  {testResults.length === 0 ? "No Results Yet" : 
+                   testResults.every(r => r.verdict === 'Accepted') ? "✅ Accepted" : "❌ Wrong Answer"}
+                </h2>
+              </div>
+
+              {/* Case Result Tabs */}
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {testResults.map((r, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActiveCase(i)}
+                    className={`flex flex-col items-start px-4 py-2 rounded-lg border transition-all min-w-[100px] ${
+                      activeCase === i 
+                      ? 'bg-gray-700/50 border-gray-500 ring-1 ring-gray-400' 
+                      : 'bg-gray-800/30 border-gray-700 opacity-60 hover:opacity-100'
+                    }`}
+                  >
+                    <span className="text-xs text-gray-400">Case {r.case}</span>
+                    <span className={`text-sm font-bold ${
+                      r.verdict === 'Accepted' ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      {r.verdict === 'Accepted' ? 'Passed' : 'Failed'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Selected Case Detail */}
+              {testResults[activeCase] && (
+                <div className="flex-1 bg-black/40 rounded-xl p-4 border border-white/5 overflow-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div className="space-y-4 font-mono text-sm">
+                    <div>
+                      <p className="text-gray-500 mb-1 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span> Input
+                      </p>
+                      <pre className="bg-white/5 p-3 rounded-lg text-gray-200">
+                        {typeof testResults[activeCase].input === 'object' 
+                         ? JSON.stringify(testResults[activeCase].input) 
+                         : String(testResults[activeCase].input)}
+                      </pre>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-gray-500 mb-1 flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-400"></span> Expected
+                        </p>
+                        <pre className="bg-green-400/5 p-3 rounded-lg text-green-200/80 border border-green-500/10">
+                          {testResults[activeCase].expected}
+                        </pre>
+                      </div>
+
+                      <div>
+                        <p className="text-gray-500 mb-1 flex items-center gap-2">
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            testResults[activeCase].verdict === 'Accepted' ? 'bg-green-400' : 'bg-red-400'
+                          }`}></span> Output
+                        </p>
+                        <pre className={`p-3 rounded-lg border ${
+                          testResults[activeCase].verdict === 'Accepted' 
+                          ? 'bg-green-400/5 text-green-200/80 border-green-500/10' 
+                          : 'bg-red-400/5 text-red-200 border-red-500/10'
+                        }`}>
+                          {testResults[activeCase].output || "No output"}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Fallback for Run (no testResults array) */}
+              {!testResults[activeCase] && output && (
+                <pre className="bg-black/40 p-4 rounded-xl text-sm h-full whitespace-pre-wrap border border-white/5 font-mono text-gray-300">
+                  {output}
+                </pre>
+              )}
+            </div>
           )}
         </div>
       </div>

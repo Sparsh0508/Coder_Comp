@@ -50,22 +50,34 @@ module.exports = (io) => {
 
       console.log("🔥 MATCHING:", player1.userId, player2.userId);
 
+      // ✅ Pick a random problem (or hardcode for now if problems table is not stable)
+      let problemId = 1; // Default
+      try {
+        const [probs] = await db.query("SELECT id FROM problems ORDER BY RAND() LIMIT 1");
+        if (probs && probs.length > 0) problemId = probs[0].id;
+      } catch (err) {
+        console.error("No problems found, defaulting to 1");
+      }
+
       const matchId = await matchService.createMatch(
         player1.userId,
-        player2.userId
+        player2.userId,
+        problemId
       );
 
     console.log("Sending usernames:", user1[0][0].username, user2[0][0].username);
       io.to(player1.socketId).emit("match_found", {
         matchId,
         players: [player1.userId, player2.userId],
-        playersNames:[user1[0][0].username, user2[0][0].username]
+        playersNames:[user1[0][0].username, user2[0][0].username],
+        problemId: problemId
       });
 
       io.to(player2.socketId).emit("match_found", {
         matchId,
         players: [player2.userId, player1.userId],
-        playersNames:[user2[0][0].username,user1[0][0].username]
+        playersNames:[user2[0][0].username,user1[0][0].username],
+        problemId: problemId
       });
 
       await matchService.startMatch(matchId);

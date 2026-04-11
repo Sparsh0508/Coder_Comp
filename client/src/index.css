@@ -1,39 +1,65 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap");
 @import "tailwindcss";
 
 @theme {
-  --font-outfit: "Outfit", sans-serif;
-  --color-bg-deep: #050508;
-  --color-card-bg: rgba(18, 18, 24, 0.85);
-  --color-glass-border: rgba(255, 255, 255, 0.1);
-  --color-text-secondary: #a0a0b0;
-  --color-accent: #7000ff;
+  --font-sans: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
 
-  --background-image-primary-gradient: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%);
+  --color-arena-950: #07111d;
+  --color-arena-900: #0d1726;
+  --color-arena-800: #142337;
+  --color-arena-700: #1b3148;
+  --color-arena-500: #3dd9b8;
+  --color-arena-400: #6be6cb;
+  --color-flame-500: #ff8a3d;
+  --color-flame-400: #ffae73;
+  --color-paper-200: #d6e2f0;
+  --color-paper-100: #eef6ff;
 }
 
 @layer base {
+  * {
+    box-sizing: border-box;
+  }
+
   body {
-    @apply font-outfit bg-bg-deep text-white min-h-screen overflow-x-hidden;
+    @apply min-h-screen bg-arena-950 font-sans text-paper-100 antialiased;
     background-image:
-      radial-gradient(circle at 20% 20%, rgba(112, 0, 255, 0.15) 0%, transparent 40%),
-      radial-gradient(circle at 80% 80%, rgba(0, 210, 255, 0.15) 0%, transparent 40%);
+      radial-gradient(circle at top left, rgba(61, 217, 184, 0.18), transparent 28%),
+      radial-gradient(circle at top right, rgba(255, 138, 61, 0.16), transparent 34%),
+      linear-gradient(180deg, #08111d 0%, #060b14 100%);
+  }
+
+  #root {
+    @apply min-h-screen;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    @apply outline-none;
   }
 }
 
-/* Custom Utilities that might not be easily tailwind-ified without many classes */
-.glass-effect {
-  @apply backdrop-blur-xl border border-glass-border bg-card-bg;
-}
+@layer components {
+  .arena-panel {
+    @apply rounded-3xl border border-white/10 bg-white/5 shadow-[0_20px_80px_rgba(0,0,0,0.25)] backdrop-blur-xl;
+  }
 
-.auth-gradient-text {
-  @apply bg-clip-text text-transparent bg-primary-gradient bg-fixed;
-}
+  .arena-button {
+    @apply inline-flex items-center justify-center rounded-2xl px-4 py-3 font-medium transition duration-200;
+  }
 
-.auth-button-shadow {
-  box-shadow: 0 10px 15px -3px rgba(58, 123, 213, 0.4);
-}
+  .arena-button-primary {
+    @apply inline-flex items-center justify-center rounded-2xl bg-arena-500 px-4 py-3 font-medium text-arena-950 transition duration-200 hover:bg-arena-400;
+  }
 
-.auth-button-shadow:hover {
-  box-shadow: 0 20px 25px -5px rgba(58, 123, 213, 0.5);
+  .arena-button-secondary {
+    @apply inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-4 py-3 font-medium text-paper-100 transition duration-200 hover:bg-white/10;
+  }
+
+  .arena-input {
+    @apply w-full rounded-2xl border border-white/10 bg-arena-900/80 px-4 py-3 text-paper-100 placeholder:text-paper-200/45 focus:border-arena-500;
+  }
 }

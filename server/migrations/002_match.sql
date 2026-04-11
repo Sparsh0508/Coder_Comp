@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS matches (
     player1_id BIGINT NOT NULL,
     player2_id BIGINT NOT NULL,
 
-    problem_id BIGINT NOT NULL, -- 🔥 ADD THIS
+    problem_id BIGINT NULL, -- 🔥 ADD THIS
 
     status ENUM('WAITING','ACTIVE','FINISHED','CANCELLED') DEFAULT 'WAITING',
 

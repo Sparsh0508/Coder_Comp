@@ -1,25 +1,26 @@
-// server.js (or index.js)
-const cors = require("cors");
-const dotenv = require("dotenv");
-dotenv.config();
-const {Server}= require("socket.io");
-const socketAuth = require("./src/middleware/socketAuth");
-const matchSocket = require("./src/modules/match/match.socket");
-const app = require("./app");
-const runMigrations = require("./src/config/migrate");
+require("dotenv").config();
 
-const PORT = process.env.PORT || 8081;
 const http = require("http");
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: "*" }
-});
+const app = require("./app");
+const connectDb = require("./utils/connectDb");
+const { initializeSocketServer } = require("./sockets");
 
-io.use(socketAuth);
-matchSocket(io);
-(async () => {
-  await runMigrations();
+const PORT = process.env.PORT || 8080;
+
+async function bootstrap() {
+  await connectDb();
+
+  const server = http.createServer(app);
+  const io = initializeSocketServer(server);
+
+  app.set("io", io);
+
   server.listen(PORT, () => {
-    console.log(`Server Is Running On PORT ${PORT}`);
+    console.log(`CodeCamp Arena server listening on port ${PORT}`);
   });
-})();
+}
+
+bootstrap().catch((error) => {
+  console.error("Failed to bootstrap server", error);
+  process.exit(1);
+});

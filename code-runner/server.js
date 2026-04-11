@@ -4,6 +4,7 @@ const cors = require("cors");
 const { runPython } = require("./runners/python");
 const { runCpp } = require("./runners/cpp");
 const { runJava } = require("./runners/java");
+const { runJS } = require("./runners/javascript");
 const { judge } = require("./judge/judge");
 
 const app = express();
@@ -18,6 +19,7 @@ function getRunner(language) {
   if (language === "python") return runPython;
   if (language === "cpp") return runCpp;
   if (language === "java") return runJava;
+  if (language === "javascript") return runJS;
   return null;
 }
 
@@ -128,7 +130,7 @@ console.log(solve(nums, target));
 //////////////////////////////////////////////////////////
 
 app.post("/api/run", async (req, res) => {
-  const { language, code, input } = req.body;
+  const { language, code, input, inputs } = req.body;
 
   const runner = getRunner(language);
   if (!runner) {
@@ -136,27 +138,46 @@ app.post("/api/run", async (req, res) => {
   }
 
   try {
-    // ✅ Normalize once
-    const normalizedInput = normalizeInput(input);
+    // 🔥 Multi-run support
+    if (Array.isArray(inputs) && inputs.length > 0) {
+      const results = await Promise.all(
+        inputs.map(async (currInput, idx) => {
+          const normalized = normalizeInput(currInput);
+          let finalCode = code;
 
-    let finalCode = code;
+          if (language === "java") finalCode = wrapJava(code, normalized);
+          else if (language === "cpp") finalCode = wrapCpp(code, normalized);
+          else if (language === "python") finalCode = wrapPython(code, normalized);
+          else if (language === "javascript") finalCode = wrapJS(code, normalized);
 
-    // ✅ Wrap based on language
-    if (language === "java") {
-      finalCode = wrapJava(code, normalizedInput);
-    } else if (language === "cpp") {
-      finalCode = wrapCpp(code, normalizedInput);
-    } else if (language === "python") {
-      finalCode = wrapPython(code, normalizedInput);
-    } else if (language === "javascript") {
-      finalCode = wrapJS(code, normalizedInput);
+          const result = await runner(finalCode);
+          return {
+            case: idx + 1,
+            input: currInput,
+            output: result.output || "",
+            error: result.error || "",
+            verdict: result.status === "Success" ? "Accepted" : result.status || "Runtime Error"
+          };
+        })
+      );
+
+      return res.json({ results, status: "Success" });
     }
 
-    // ✅ NO INPUT PASSED (wrapper handles it)
+    // Single run fallback
+    const normalizedInput = normalizeInput(input);
+    let finalCode = code;
+
+    if (language === "java") finalCode = wrapJava(code, normalizedInput);
+    else if (language === "cpp") finalCode = wrapCpp(code, normalizedInput);
+    else if (language === "python") finalCode = wrapPython(code, normalizedInput);
+    else if (language === "javascript") finalCode = wrapJS(code, normalizedInput);
+
     const result = await runner(finalCode);
 
     return res.json({
       output: result.output || "",
+      error: result.error || "",
       status: result.status,
     });
 
@@ -164,6 +185,7 @@ app.post("/api/run", async (req, res) => {
     console.error(err);
     return res.json({
       output: "",
+      error: "Internal Server Error",
       status: "Runtime Error",
     });
   }
