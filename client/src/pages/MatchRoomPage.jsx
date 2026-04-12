@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import EditorPanel from "../components/EditorPanel";
@@ -33,7 +33,7 @@ function formatResultOutput(result) {
 function MatchRoomPage() {
   const navigate = useNavigate();
   const { matchId } = useParams();
-  const { user } = useAuth();
+  const { user, refreshUser, updateUser } = useAuth();
   const [match, setMatch] = useState(null);
   const [language, setLanguage] = useState("cpp");
   const [code, setCode] = useState(defaultTemplates.cpp);
@@ -41,20 +41,41 @@ function MatchRoomPage() {
   const [running, setRunning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
+  const loadedMatchIdRef = useRef(null);
+  const hasNavigatedToResultRef = useRef(false);
+
+  const updateRosterPlayer = (players, payload) =>
+    players.map((player) =>
+      player.id === payload.userId
+        ? {
+            ...player,
+            language: payload.language || player.language,
+            isTyping: payload.isTyping ?? player.isTyping,
+            passedTests: payload.passedTests ?? player.passedTests,
+            totalTests: payload.totalTests ?? player.totalTests,
+            hasSubmitted: payload.hasSubmitted ?? player.hasSubmitted,
+            status: payload.status || player.status,
+          }
+        : player
+    );
 
   const socketState = useMatchSocket({
     matchId,
     roomId: match?.roomId,
+    onMatchStarted() {},
+    onLobbyUpdated() {},
+    onMatchCancelled(payload) {
+      setOutput(payload.reason || "Match cancelled.");
+      refreshUser().catch(() => {});
+      navigate("/matchmaking");
+    },
     onOpponentUpdate(payload) {
       setMatch((current) =>
         current
           ? {
               ...current,
-              opponent: {
-                ...current.opponent,
-                language: payload.language || current.opponent?.language,
-                isTyping: payload.isTyping,
-              },
+              teammates: updateRosterPlayer(current.teammates || [], payload),
+              opponents: updateRosterPlayer(current.opponents || [], payload),
             }
           : current
       );
@@ -80,25 +101,60 @@ function MatchRoomPage() {
 
         return {
           ...current,
-          opponent: {
-            ...current.opponent,
-            passedTests: payload.passedTests,
-            totalTests: payload.totalTests,
+          teammates: updateRosterPlayer(current.teammates || [], {
+            ...payload,
             hasSubmitted: true,
             isTyping: false,
-          },
+            status: payload.allPassed ? "accepted" : "submitted",
+          }),
+          opponents: updateRosterPlayer(current.opponents || [], {
+            ...payload,
+            hasSubmitted: true,
+            isTyping: false,
+            status: payload.allPassed ? "accepted" : "submitted",
+          }),
         };
       });
     },
     onMatchEnd(payload) {
       setResult(payload);
+      refreshUser().catch(() => {});
+      if (!hasNavigatedToResultRef.current) {
+        hasNavigatedToResultRef.current = true;
+        navigate(`/match/${matchId}/result`, { state: { result: payload }, replace: true });
+      }
     },
   });
 
   useEffect(() => {
+    if (loadedMatchIdRef.current === matchId) {
+      return;
+    }
+
+    loadedMatchIdRef.current = matchId;
+
     async function loadMatch() {
       const response = await getMatchById(matchId);
+
+      if (response.match.status === "lobby") {
+        navigate(`/match/${matchId}/lobby`, { replace: true });
+        return;
+      }
+
+      if (response.match.status === "cancelled") {
+        navigate("/matchmaking", { replace: true });
+        return;
+      }
+
+      if (response.match.status === "completed") {
+        navigate(`/match/${matchId}/result`, { replace: true });
+        return;
+      }
+
       setMatch(response.match);
+      if (response.match.currentPlayer?.coinBalance !== undefined) {
+        updateUser({ coinBalance: response.match.currentPlayer.coinBalance });
+      }
 
       const starterCode =
         response.match.problem?.starterCode?.cpp ||
@@ -110,7 +166,7 @@ function MatchRoomPage() {
     loadMatch().catch((error) => {
       setOutput(error.message);
     });
-  }, [matchId]);
+  }, [matchId, navigate, updateUser]);
 
   useEffect(() => {
     if (!match?.problem) {
@@ -126,7 +182,7 @@ function MatchRoomPage() {
   useEffect(() => {
     if (timer === "00:00" && !result && match?.status !== "completed") {
       setResult({
-        winnerId: match?.opponent?.id,
+        winnerTeam: match?.currentPlayer?.team === 1 ? 2 : 1,
         reason: "Time ran out before you finished the hidden suite.",
       });
     }
@@ -168,9 +224,30 @@ function MatchRoomPage() {
       if (response.match?.winnerId) {
         setResult({
           winnerId: response.match.winnerId,
+          winnerTeam: response.match.winnerTeam,
+          prizePool: response.match.prizePool,
+          rewardedUserIds: response.match.rewardedUserIds,
+          perWinnerReward: response.match.perWinnerReward,
           reason: response.result.allPassed ? "Accepted solution submitted first." : undefined,
         });
+        if (!hasNavigatedToResultRef.current) {
+          hasNavigatedToResultRef.current = true;
+          navigate(`/match/${matchId}/result`, {
+            state: {
+              result: {
+                winnerId: response.match.winnerId,
+                winnerTeam: response.match.winnerTeam,
+                prizePool: response.match.prizePool,
+                rewardedUserIds: response.match.rewardedUserIds,
+                perWinnerReward: response.match.perWinnerReward,
+                reason: response.result.allPassed ? "Accepted solution submitted first." : undefined,
+              },
+            },
+            replace: true,
+          });
+        }
       }
+      refreshUser().catch(() => {});
     } catch (error) {
       setOutput(error.message);
     } finally {
@@ -185,7 +262,7 @@ function MatchRoomPage() {
 
   return (
     <>
-      <ResultBanner result={result} userId={user?.id} />
+      <ResultBanner result={result} userId={user?.id} userTeam={match?.currentPlayer?.team} />
 
       <div className="grid h-full gap-4 xl:grid-cols-[0.92fr_1.08fr]">
         <div className="min-h-0">
@@ -194,7 +271,9 @@ function MatchRoomPage() {
 
         <div className="grid min-h-0 gap-4">
           <OpponentPanel
-            opponent={match.opponent}
+            mode={match.mode}
+            teammates={match.teammates}
+            opponents={match.opponents}
             currentPlayer={{ ...match.currentPlayer, username: user?.username, rating: user?.rating }}
             queueMessage={queueMessage}
           />

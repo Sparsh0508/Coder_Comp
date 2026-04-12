@@ -47,8 +47,8 @@ function DashboardPage() {
                 <div className="mt-2 text-lg font-semibold">{user?.rating}</div>
               </div>
               <div className="rounded-2xl border border-white/10 bg-black/15 p-3">
-                <div className="text-paper-200/45">Matches</div>
-                <div className="mt-2 text-lg font-semibold">{user?.totalMatches}</div>
+                <div className="text-paper-200/45">Coins</div>
+                <div className="mt-2 text-lg font-semibold">{user?.coinBalance ?? 0}</div>
               </div>
             </div>
           </div>
@@ -65,8 +65,9 @@ function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-4">
         <StatCard label="Current Rating" value={user?.rating ?? 1200} accent="text-arena-400" />
+        <StatCard label="Coin Balance" value={user?.coinBalance ?? 0} accent="text-yellow-300" />
         <StatCard label="Wins" value={user?.wins ?? 0} accent="text-flame-400" />
         <StatCard label="Losses" value={user?.losses ?? 0} accent="text-paper-100" />
       </section>

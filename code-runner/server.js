@@ -205,6 +205,8 @@ app.post("/api/run", async (req, res) => {
 
 app.post("/api/execute", async (req, res) => {
   const { language, code, stdin } = req.body;
+  console.log(language, code, stdin);
+  
 
   const runner = getRunner(language);
   if (!runner) {
@@ -239,7 +241,7 @@ app.post("/api/execute", async (req, res) => {
 
 app.post("/api/submit", async (req, res) => {
   const { language, code } = req.body;
-
+  console.log(language, code);
   const runner = getRunner(language);
 
   const problem = {

@@ -7,6 +7,8 @@ exports.execute = (code, extension, runCommandBuilder, input = "", timeoutMs = 3
   return new Promise((resolve) => {
     const id = randomUUID();
     const tempDir = path.join(__dirname, "..", "temp", id);
+    console.log(code, extension, runCommandBuilder, input);
+    
 
     fs.mkdirSync(tempDir, { recursive: true });
     const fileName = `Main.${extension}`;

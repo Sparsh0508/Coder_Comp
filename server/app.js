@@ -13,6 +13,7 @@ const leaderboardRoutes = require("./routes/leaderboardRoutes");
 const { errorHandler, notFoundHandler } = require("./middleware/errorMiddleware");
 
 const app = express();
+const isProduction = process.env.NODE_ENV === "production";
 
 const allowedOrigins = (process.env.CLIENT_ORIGIN || "http://localhost:5173")
   .split(",")
@@ -32,14 +33,21 @@ app.use(
 );
 
 app.use(helmet());
-app.use(
-  rateLimit({
-    windowMs: 60 * 1000,
-    limit: 120,
-    standardHeaders: true,
-    legacyHeaders: false,
-  })
-);
+
+if (isProduction) {
+  app.use(
+    rateLimit({
+      windowMs: 60 * 1000,
+      limit: 120,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: {
+        success: false,
+        message: "Too many requests. Please wait a minute and try again.",
+      },
+    })
+  );
+}
 app.use(morgan("dev"));
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());

@@ -19,3 +19,23 @@ export async function getCurrentUser() {
   const { data } = await api.get("/auth/me");
   return data;
 }
+
+export async function updateProfile(payload) {
+  const { data } = await api.put("/auth/profile", payload);
+  return data;
+}
+
+export async function getWallet() {
+  const { data } = await api.get("/auth/wallet");
+  return data;
+}
+
+export async function depositCoins(payload) {
+  const { data } = await api.post("/auth/wallet/deposit", payload);
+  return data;
+}
+
+export async function withdrawCoins(payload) {
+  const { data } = await api.post("/auth/wallet/withdraw", payload);
+  return data;
+}

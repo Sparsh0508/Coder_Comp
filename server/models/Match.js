@@ -11,6 +11,19 @@ const matchPlayerSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    team: {
+      type: Number,
+      enum: [1, 2],
+      required: true,
+    },
+    coinContribution: {
+      type: Number,
+      default: 0,
+    },
+    balanceAfterEntry: {
+      type: Number,
+      default: 0,
+    },
     status: {
       type: String,
       enum: ["waiting", "coding", "submitted", "accepted", "defeated", "disconnected"],
@@ -53,13 +66,23 @@ const matchSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
+    mode: {
+      type: String,
+      enum: ["1v1", "2v2", "4v4"],
+      default: "1v1",
+    },
+    teamSize: {
+      type: Number,
+      enum: [1, 2, 4],
+      default: 1,
+    },
     players: {
       type: [matchPlayerSchema],
       validate: {
         validator(players) {
-          return players.length === 2;
+          return [2, 4, 8].includes(players.length);
         },
-        message: "A match must have exactly two players",
+        message: "A match must have 2, 4, or 8 players",
       },
     },
     problem: {
@@ -69,8 +92,16 @@ const matchSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["pending", "active", "completed", "cancelled"],
-      default: "active",
+      enum: ["pending", "lobby", "active", "completed", "cancelled"],
+      default: "lobby",
+    },
+    lobbyEndsAt: {
+      type: Date,
+      required: true,
+    },
+    matchStartsAt: {
+      type: Date,
+      required: true,
     },
     countdownEndsAt: {
       type: Date,
@@ -85,6 +116,23 @@ const matchSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null,
+    },
+    winnerTeam: {
+      type: Number,
+      enum: [1, 2],
+      default: null,
+    },
+    entryCoins: {
+      type: Number,
+      default: 0,
+    },
+    prizePool: {
+      type: Number,
+      default: 0,
+    },
+    prizeDistributed: {
+      type: Boolean,
+      default: false,
     },
   },
   {

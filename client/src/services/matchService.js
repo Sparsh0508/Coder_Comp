@@ -5,8 +5,8 @@ export async function findMatch(payload) {
   return data;
 }
 
-export async function leaveQueue() {
-  const { data } = await api.post("/match/leave");
+export async function leaveQueue(payload = {}) {
+  const { data } = await api.post("/match/leave", payload);
   return data;
 }
 

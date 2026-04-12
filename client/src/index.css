@@ -62,4 +62,122 @@
   .arena-input {
     @apply w-full rounded-2xl border border-white/10 bg-arena-900/80 px-4 py-3 text-paper-100 placeholder:text-paper-200/45 focus:border-arena-500;
   }
+
+  .arena-chest {
+    @apply relative overflow-hidden rounded-[2rem] border border-white/10 bg-arena-900/80 shadow-[0_0_60px_rgba(61,217,184,0.18)];
+  }
+}
+
+@keyframes arenaPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(61, 217, 184, 0.28);
+  }
+
+  50% {
+    transform: scale(1.03);
+    box-shadow: 0 0 32px rgba(255, 138, 61, 0.28);
+  }
+}
+
+@keyframes coinRise {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.arena-payout-stream {
+  position: relative;
+  overflow: hidden;
+}
+
+@keyframes payoutToLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(0) translateY(0) scale(0.8);
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(-220px) translateY(-20px) scale(1.15);
+  }
+}
+
+@keyframes payoutToRight {
+  0% {
+    opacity: 0;
+    transform: translateX(0) translateY(0) scale(0.8);
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(220px) translateY(-20px) scale(1.15);
+  }
+}
+
+@keyframes celebrateFade {
+  0% {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.arena-chest-glow {
+  animation: arenaPulse 2.4s ease-in-out infinite;
+}
+
+.arena-coin-pop {
+  animation: coinRise 500ms ease forwards;
+}
+
+.arena-celebrate-in {
+  animation: celebrateFade 700ms ease forwards;
+}
+
+.arena-payout-left::before,
+.arena-payout-right::before,
+.arena-payout-left::after,
+.arena-payout-right::after {
+  content: "$";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  font-weight: 700;
+  color: #ffcf6a;
+  opacity: 0;
+}
+
+.arena-payout-left::before {
+  animation: payoutToLeft 1.6s ease-in-out infinite;
+}
+
+.arena-payout-left::after {
+  animation: payoutToLeft 1.6s ease-in-out 240ms infinite;
+}
+
+.arena-payout-right::before {
+  animation: payoutToRight 1.6s ease-in-out infinite;
+}
+
+.arena-payout-right::after {
+  animation: payoutToRight 1.6s ease-in-out 240ms infinite;
 }

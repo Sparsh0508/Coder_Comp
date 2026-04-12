@@ -2,16 +2,53 @@ const Match = require("../models/Match");
 const Problem = require("../models/Problem");
 const Submission = require("../models/Submission");
 const User = require("../models/User");
+const { awardPrizePool } = require("../utils/matchEconomy");
 const { evaluateCode } = require("../utils/executor");
 const { calculateElo } = require("../utils/elo");
 
-function buildMatchSummary(match, winnerId) {
+function buildMatchSummary(match, winnerId, winnerTeam, rewardSummary = {}) {
   return {
     matchId: match._id,
     winnerId,
+    winnerTeam,
     endedAt: match.endedAt,
     status: match.status,
+    prizePool: match.prizePool,
+    rewardedUserIds: rewardSummary.rewardedUserIds || [],
+    perWinnerReward: rewardSummary.perWinnerReward || 0,
   };
+}
+
+async function updateTeamRatings(match, winningTeam) {
+  const winners = match.players.filter((player) => player.team === winningTeam);
+  const losers = match.players.filter((player) => player.team !== winningTeam);
+
+  if (!winners.length || !losers.length) {
+    return;
+  }
+
+  const winnerUsers = await User.find({ _id: { $in: winners.map((player) => player.user._id) } });
+  const loserUsers = await User.find({ _id: { $in: losers.map((player) => player.user._id) } });
+
+  const averageWinnerRating = winnerUsers.reduce((sum, user) => sum + user.rating, 0) / winnerUsers.length;
+  const averageLoserRating = loserUsers.reduce((sum, user) => sum + user.rating, 0) / loserUsers.length;
+  const { winnerRating, loserRating } = calculateElo(averageWinnerRating, averageLoserRating);
+  const winnerDelta = winnerRating - Math.round(averageWinnerRating);
+  const loserDelta = loserRating - Math.round(averageLoserRating);
+
+  winnerUsers.forEach((user) => {
+    user.rating += winnerDelta;
+    user.wins += 1;
+    user.totalMatches += 1;
+  });
+
+  loserUsers.forEach((user) => {
+    user.rating += loserDelta;
+    user.losses += 1;
+    user.totalMatches += 1;
+  });
+
+  await Promise.all([...winnerUsers, ...loserUsers].map((user) => user.save()));
 }
 
 async function runCode(req, res, next) {
@@ -69,7 +106,7 @@ async function submitCode(req, res, next) {
 
     const match = await Match.findById(matchId)
       .populate("problem")
-      .populate("players.user", "username rating");
+      .populate("players.user", "username rating coinBalance");
 
     if (!match) {
       return res.status(404).json({ success: false, message: "Match not found" });
@@ -114,32 +151,30 @@ async function submitCode(req, res, next) {
     player.isTyping = false;
 
     let winnerUserId = null;
+    let winnerTeam = null;
+    let rewardSummary = {};
 
     if (evaluation.allPassed && match.status !== "completed") {
       winnerUserId = req.user._id.toString();
+      winnerTeam = player.team;
       match.status = "completed";
       match.winner = req.user._id;
+      match.winnerTeam = player.team;
       match.endedAt = new Date();
       submission.isWinnerSubmission = true;
       await submission.save();
 
-      const opponent = match.players.find((item) => item.user._id.toString() !== req.user._id.toString());
-      if (opponent) {
-        opponent.status = opponent.hasSubmitted ? opponent.status : "defeated";
-      }
+      match.players.forEach((entry) => {
+        if (entry.team === player.team) {
+          entry.status = "accepted";
+        } else {
+          entry.status = "defeated";
+          entry.isTyping = false;
+        }
+      });
 
-      const winner = await User.findById(req.user._id);
-      const loser = await User.findById(opponent.user._id);
-      const { winnerRating, loserRating } = calculateElo(winner.rating, loser.rating);
-
-      winner.rating = winnerRating;
-      winner.wins += 1;
-      winner.totalMatches += 1;
-      loser.rating = loserRating;
-      loser.losses += 1;
-      loser.totalMatches += 1;
-
-      await Promise.all([winner.save(), loser.save()]);
+      await updateTeamRatings(match, player.team);
+      rewardSummary = await awardPrizePool(match, player.team);
     }
 
     await match.save();
@@ -150,6 +185,7 @@ async function submitCode(req, res, next) {
       userId: req.user._id.toString(),
       username: req.user.username,
       language,
+      team: player.team,
       passedTests: evaluation.passedCount,
       totalTests: evaluation.totalCount,
       allPassed: evaluation.allPassed,
@@ -157,15 +193,15 @@ async function submitCode(req, res, next) {
     });
 
     if (winnerUserId) {
-      io.to(match.roomId).emit("matchEnd", buildMatchSummary(match, winnerUserId));
+      io.to(match.roomId).emit("matchEnd", buildMatchSummary(match, winnerUserId, winnerTeam, rewardSummary));
     }
 
     return res.status(200).json({
       success: true,
-      message: evaluation.allPassed ? "Accepted. You won the match." : "Submission evaluated",
+      message: evaluation.allPassed ? "Accepted. Your team won the match." : "Submission evaluated",
       submissionId: submission._id,
       result: evaluation,
-      match: buildMatchSummary(match, winnerUserId),
+      match: buildMatchSummary(match, winnerUserId, winnerTeam, rewardSummary),
     });
   } catch (error) {
     return next(error);

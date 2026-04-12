@@ -1,9 +1,9 @@
-function ResultBanner({ result, userId }) {
+function ResultBanner({ result, userId, userTeam }) {
   if (!result) {
     return null;
   }
 
-  const hasWon = result.winnerId === userId;
+  const hasWon = result.winnerTeam ? result.winnerTeam === userTeam : result.winnerId === userId;
 
   return (
     <div

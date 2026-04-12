@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Crown, LogOut, Swords, Trophy } from "lucide-react";
+import { CircleUserRound, Crown, LogOut, Swords, Trophy, Wallet } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
 
@@ -7,6 +7,8 @@ const navigation = [
   { to: "/dashboard", label: "Dashboard", icon: Crown },
   { to: "/matchmaking", label: "Find Match", icon: Swords },
   { to: "/leaderboard", label: "Leaderboard", icon: Trophy },
+  { to: "/profile", label: "Profile", icon: CircleUserRound },
+  { to: "/wallet", label: "Wallet", icon: Wallet },
 ];
 
 function AppShell() {
@@ -33,16 +35,16 @@ function AppShell() {
           </Link>
 
           <nav className="flex flex-wrap gap-2">
-            {navigation.map(({ to, label, icon: Icon }) => (
+            {navigation.map((item) => (
               <NavLink
-                key={to}
-                to={to}
+                key={item.to}
+                to={item.to}
                 className={({ isActive }) =>
                   `arena-button-secondary gap-2 ${isActive ? "border-arena-500/60 bg-arena-500/10 text-arena-400" : ""}`
                 }
               >
-                <Icon size={18} />
-                {label}
+                <item.icon size={18} />
+                {item.label}
               </NavLink>
             ))}
           </nav>
@@ -50,7 +52,7 @@ function AppShell() {
           <div className="flex items-center gap-3">
             <div className="rounded-2xl border border-white/10 bg-arena-900/60 px-4 py-2">
               <div className="text-sm font-medium">{user?.username}</div>
-              <div className="text-xs text-paper-200/60">Rating {user?.rating}</div>
+              <div className="text-xs text-paper-200/60">Rating {user?.rating} · {user?.coinBalance ?? 0} coins</div>
             </div>
             <button onClick={handleLogout} className="arena-button-secondary gap-2">
               <LogOut size={18} />

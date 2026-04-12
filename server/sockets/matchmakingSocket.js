@@ -1,34 +1,170 @@
 const Match = require("../models/Match");
 const Problem = require("../models/Problem");
+const { awardPrizePool, deductEntryCoins, refundEntryCoins } = require("../utils/matchEconomy");
+const {
+  LOBBY_DURATION_MS,
+  MATCH_DURATION_MS,
+  getEntryCoins,
+  getRequiredPlayers,
+  getSupportedModes,
+  getTeamSize,
+} = require("../utils/matchConfig");
 
-const matchmakingQueue = [];
+const matchmakingQueues = new Map(getSupportedModes().map((mode) => [mode, []]));
 const connectedUsers = new Map();
+const lobbyTimers = new Map();
 
-async function createMatch(io, playerOne, playerTwo) {
+function getQueue(mode) {
+  return matchmakingQueues.get(mode) || matchmakingQueues.get("1v1");
+}
+
+function getQueueSummary(mode) {
+  const queue = getQueue(mode);
+  const requiredPlayers = getRequiredPlayers(mode);
+
+  return {
+    mode,
+    queueSize: queue.length,
+    requiredPlayers,
+    spotsLeft: Math.max(requiredPlayers - queue.length, 0),
+  };
+}
+
+function emitQueueUpdate(io, mode) {
+  const payload = getQueueSummary(mode);
+
+  getQueue(mode).forEach(({ socketId }) => {
+    const socket = io.sockets.sockets.get(socketId);
+    if (socket) {
+      socket.emit("queueUpdate", payload);
+    }
+  });
+}
+
+function buildTeamPayload(players) {
+  return players.map((player) => ({
+    id: player.user._id,
+    username: player.user.username,
+    rating: player.user.rating,
+    coinBalance: player.user.coinBalance,
+    team: player.team,
+    coinContribution: player.coinContribution,
+    balanceAfterEntry: player.balanceAfterEntry,
+  }));
+}
+
+function buildLobbyPayload(match) {
+  return {
+    matchId: match._id.toString(),
+    roomId: match.roomId,
+    mode: match.mode,
+    teamSize: match.teamSize,
+    entryCoins: match.entryCoins,
+    prizePool: match.prizePool,
+    lobbyEndsAt: match.lobbyEndsAt,
+    matchStartsAt: match.matchStartsAt,
+    countdownEndsAt: match.countdownEndsAt,
+    status: match.status,
+  };
+}
+
+function scheduleLobbyStart(io, matchId) {
+  if (lobbyTimers.has(matchId)) {
+    clearTimeout(lobbyTimers.get(matchId));
+  }
+
+  const timer = setTimeout(async () => {
+    try {
+      const match = await Match.findById(matchId).populate("problem");
+
+      if (!match || match.status !== "lobby") {
+        return;
+      }
+
+      match.status = "active";
+      await match.save();
+
+      io.to(match.roomId).emit("matchStarted", {
+        matchId: match._id.toString(),
+        roomId: match.roomId,
+        matchStartsAt: match.matchStartsAt,
+        countdownEndsAt: match.countdownEndsAt,
+        problem: match.problem,
+      });
+    } finally {
+      lobbyTimers.delete(matchId);
+    }
+  }, LOBBY_DURATION_MS);
+
+  lobbyTimers.set(matchId, timer);
+}
+
+async function createMatch(io, queuedPlayers, mode) {
   const [problem] = await Problem.aggregate([{ $sample: { size: 1 } }]);
 
   if (!problem) {
     throw new Error("No problems available for matchmaking");
   }
 
-  const countdownEndsAt = new Date(Date.now() + 30 * 60 * 1000);
+  const teamSize = getTeamSize(mode);
+  const entryCoins = getEntryCoins(mode);
+  const deduction = await deductEntryCoins(
+    queuedPlayers.map((player) => player.userId),
+    entryCoins
+  );
+
+  if (!deduction.success) {
+    const insufficientSet = new Set(deduction.insufficientUserIds);
+    const eligiblePlayers = queuedPlayers.filter((player) => !insufficientSet.has(player.userId));
+
+    eligiblePlayers.forEach((player) => getQueue(mode).unshift(player));
+    queuedPlayers
+      .filter((player) => insufficientSet.has(player.userId))
+      .forEach((player) => {
+        const socket = io.sockets.sockets.get(player.socketId);
+        if (socket) {
+          socket.emit("queueError", { message: "Insufficient coins for this match entry." });
+        }
+      });
+
+    emitQueueUpdate(io, mode);
+    return null;
+  }
+
+  const lobbyEndsAt = new Date(Date.now() + LOBBY_DURATION_MS);
+  const matchStartsAt = lobbyEndsAt;
+  const countdownEndsAt = new Date(matchStartsAt.getTime() + MATCH_DURATION_MS);
   const roomId = `match_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
   const match = await Match.create({
     roomId,
-    players: [
-      { user: playerOne.userId, socketId: playerOne.socketId, latestLanguage: "cpp" },
-      { user: playerTwo.userId, socketId: playerTwo.socketId, latestLanguage: "cpp" },
-    ],
-    problem: problem._id,
+    mode,
+    teamSize,
+    entryCoins,
+    prizePool: entryCoins * queuedPlayers.length,
+    lobbyEndsAt,
+    matchStartsAt,
     countdownEndsAt,
+    players: queuedPlayers.map((player, index) => {
+      const user = deduction.userMap.get(player.userId);
+
+      return {
+        user: player.userId,
+        socketId: player.socketId,
+        latestLanguage: "cpp",
+        team: index < teamSize ? 1 : 2,
+        coinContribution: entryCoins,
+        balanceAfterEntry: user ? user.coinBalance : 0,
+      };
+    }),
+    problem: problem._id,
   });
 
   const hydratedMatch = await Match.findById(match._id)
     .populate("problem")
-    .populate("players.user", "username rating");
+    .populate("players.user", "username rating coinBalance");
 
-  [playerOne.socketId, playerTwo.socketId].forEach((socketId) => {
+  queuedPlayers.forEach(({ socketId }) => {
     const socket = io.sockets.sockets.get(socketId);
     if (socket) {
       socket.join(roomId);
@@ -37,80 +173,139 @@ async function createMatch(io, playerOne, playerTwo) {
 
   hydratedMatch.players.forEach((player) => {
     const socket = io.sockets.sockets.get(player.socketId);
-    const opponent = hydratedMatch.players.find((entry) => entry.user._id.toString() !== player.user._id.toString());
+    const teammates = hydratedMatch.players.filter(
+      (entry) => entry.team === player.team && entry.user._id.toString() !== player.user._id.toString()
+    );
+    const opponents = hydratedMatch.players.filter((entry) => entry.team !== player.team);
 
     if (socket) {
       socket.emit("matchFound", {
-        matchId: hydratedMatch._id.toString(),
-        roomId,
-        countdownEndsAt,
-        opponent: {
-          id: opponent.user._id,
-          username: opponent.user.username,
-          rating: opponent.user.rating,
-        },
+        ...buildLobbyPayload(hydratedMatch),
+        teammates: buildTeamPayload(teammates),
+        opponents: buildTeamPayload(opponents),
       });
 
-      socket.emit("startMatch", {
-        matchId: hydratedMatch._id.toString(),
-        roomId,
-        countdownEndsAt,
-        problem: hydratedMatch.problem,
+      socket.emit("lobbyUpdated", {
+        ...buildLobbyPayload(hydratedMatch),
+        currentPlayer: {
+          id: player.user._id,
+          username: player.user.username,
+          rating: player.user.rating,
+          coinBalance: player.balanceAfterEntry,
+          team: player.team,
+          coinContribution: player.coinContribution,
+        },
+        teammates: buildTeamPayload(teammates),
+        opponents: buildTeamPayload(opponents),
       });
     }
   });
 
+  scheduleLobbyStart(io, hydratedMatch._id.toString());
   return hydratedMatch;
 }
 
 async function maybeCreateMatch(io) {
-  while (matchmakingQueue.length >= 2) {
-    const playerOne = matchmakingQueue.shift();
-    const playerTwo = matchmakingQueue.shift();
-    await createMatch(io, playerOne, playerTwo);
+  for (const mode of getSupportedModes()) {
+    const queue = getQueue(mode);
+    const requiredPlayers = getRequiredPlayers(mode);
+
+    while (queue.length >= requiredPlayers) {
+      const players = queue.splice(0, requiredPlayers);
+      await createMatch(io, players, mode);
+      emitQueueUpdate(io, mode);
+    }
   }
 }
 
 async function enqueuePlayer(io, player) {
-  const existing = matchmakingQueue.find((entry) => entry.userId === player.userId);
+  const mode = getSupportedModes().includes(player.mode) ? player.mode : "1v1";
+  const queue = getQueue(mode);
+  const existingEntry = Array.from(matchmakingQueues.entries()).find(([, entries]) =>
+    entries.some((entry) => entry.userId === player.userId)
+  );
 
-  if (existing) {
+  if (existingEntry) {
+    const [existingMode, existingQueue] = existingEntry;
+    const existing = existingQueue.find((entry) => entry.userId === player.userId);
+
+    if (existingMode !== mode) {
+      removeQueuedPlayer(player.userId);
+      queue.push({ ...player, mode });
+      emitQueueUpdate(io, existingMode);
+      emitQueueUpdate(io, mode);
+      await maybeCreateMatch(io);
+
+      return {
+        queued: true,
+        ...getQueueSummary(mode),
+        message: `You switched to the ${mode} queue`,
+      };
+    }
+
     existing.socketId = player.socketId;
+    emitQueueUpdate(io, mode);
+
     return {
       queued: true,
-      queueSize: matchmakingQueue.length,
-      message: "You are already in the queue",
+      ...getQueueSummary(mode),
+      message: `You are already in the ${mode} queue`,
     };
   }
 
-  matchmakingQueue.push(player);
+  queue.push({ ...player, mode });
+  emitQueueUpdate(io, mode);
   await maybeCreateMatch(io);
 
   return {
     queued: true,
-    queueSize: matchmakingQueue.length,
-    message: "You have joined the queue",
+    ...getQueueSummary(mode),
+    message: `You have joined the ${mode} queue`,
   };
 }
 
-function removeQueuedPlayer(userId) {
-  const index = matchmakingQueue.findIndex((entry) => entry.userId === userId);
-  if (index >= 0) {
-    matchmakingQueue.splice(index, 1);
-  }
+function removeQueuedPlayer(userId, mode) {
+  const queues = mode ? [[mode, getQueue(mode)]] : Array.from(matchmakingQueues.entries());
+
+  queues.forEach(([, queue]) => {
+    const index = queue.findIndex((entry) => entry.userId === userId);
+
+    if (index >= 0) {
+      queue.splice(index, 1);
+    }
+  });
+}
+
+function getOtherTeam(team) {
+  return team === 1 ? 2 : 1;
+}
+
+function buildMatchEndPayload(match, winningTeam, reason, rewardSummary = {}) {
+  return {
+    matchId: match._id.toString(),
+    winnerId: match.winner ? match.winner.toString() : null,
+    winnerTeam: winningTeam,
+    endedAt: match.endedAt,
+    status: match.status,
+    prizePool: match.prizePool,
+    rewardedUserIds: rewardSummary.rewardedUserIds || [],
+    perWinnerReward: rewardSummary.perWinnerReward || 0,
+    reason,
+  };
 }
 
 function registerMatchmakingHandlers(io) {
   io.on("connection", (socket) => {
     connectedUsers.set(socket.user.id, socket.id);
 
-    socket.on("joinQueue", async () => {
+    socket.on("joinQueue", async ({ mode } = {}) => {
       try {
         const result = await enqueuePlayer(io, {
           userId: socket.user.id,
           username: socket.user.username,
           rating: socket.user.rating,
           socketId: socket.id,
+          mode,
         });
 
         socket.emit("queueJoined", result);
@@ -119,9 +314,14 @@ function registerMatchmakingHandlers(io) {
       }
     });
 
-    socket.on("leaveQueue", () => {
-      removeQueuedPlayer(socket.user.id);
-      socket.emit("queueLeft", { success: true });
+    socket.on("leaveQueue", ({ mode } = {}) => {
+      removeQueuedPlayer(socket.user.id, mode);
+      if (mode) {
+        emitQueueUpdate(io, mode);
+      } else {
+        getSupportedModes().forEach((queueMode) => emitQueueUpdate(io, queueMode));
+      }
+      socket.emit("queueLeft", { success: true, ...getQueueSummary(mode || "1v1") });
     });
 
     socket.on("joinMatchRoom", ({ roomId }) => {
@@ -142,43 +342,74 @@ function registerMatchmakingHandlers(io) {
     socket.on("disconnect", async () => {
       connectedUsers.delete(socket.user.id);
       removeQueuedPlayer(socket.user.id);
+      getSupportedModes().forEach((queueMode) => emitQueueUpdate(io, queueMode));
 
-      const activeMatch = await Match.findOne({
+      const match = await Match.findOne({
         "players.socketId": socket.id,
-        status: "active",
-      }).populate("players.user", "username rating");
+        status: { $in: ["lobby", "active"] },
+      }).populate("players.user", "username rating coinBalance");
 
-      if (!activeMatch) {
+      if (!match) {
         return;
       }
 
-      const disconnectedPlayer = activeMatch.players.find((player) => player.socketId === socket.id);
-      if (disconnectedPlayer) {
-        disconnectedPlayer.status = "disconnected";
+      const disconnectedPlayer = match.players.find((player) => player.socketId === socket.id);
+
+      if (!disconnectedPlayer) {
+        return;
       }
 
-      const opponent = activeMatch.players.find((player) => player.socketId !== socket.id);
-      if (opponent) {
-        activeMatch.status = "completed";
-        activeMatch.winner = opponent.user._id;
-        activeMatch.endedAt = new Date();
+      disconnectedPlayer.status = "disconnected";
+
+      if (match.status === "lobby") {
+        if (lobbyTimers.has(match._id.toString())) {
+          clearTimeout(lobbyTimers.get(match._id.toString()));
+          lobbyTimers.delete(match._id.toString());
+        }
+
+        match.status = "cancelled";
+        match.endedAt = new Date();
+        await refundEntryCoins(match);
+        await match.save();
+
+        io.to(match.roomId).emit("matchCancelled", {
+          matchId: match._id.toString(),
+          reason: "A player left before the lobby countdown finished. Coins were refunded.",
+        });
+        return;
       }
 
-      await activeMatch.save();
+      const winningTeam = getOtherTeam(disconnectedPlayer.team);
+      match.status = "completed";
+      match.winnerTeam = winningTeam;
+      match.endedAt = new Date();
 
-      io.to(activeMatch.roomId).emit("matchEnd", {
-        matchId: activeMatch._id.toString(),
-        winnerId: opponent ? opponent.user._id.toString() : null,
-        endedAt: activeMatch.endedAt,
-        status: activeMatch.status,
-        reason: "Opponent disconnected",
+      match.players.forEach((player) => {
+        if (player.team === winningTeam && player.status !== "disconnected") {
+          player.status = "accepted";
+        } else if (player.team !== winningTeam && player.status !== "disconnected") {
+          player.status = "defeated";
+        }
       });
+
+      const winningPlayer = match.players.find((player) => player.team === winningTeam);
+
+      if (winningPlayer) {
+        match.winner = winningPlayer.user._id || winningPlayer.user;
+      }
+
+      const rewardSummary = await awardPrizePool(match, winningTeam);
+      await match.save();
+
+      io.to(match.roomId).emit("matchEnd", buildMatchEndPayload(match, winningTeam, "Opponent disconnected", rewardSummary));
     });
   });
 }
 
 module.exports = {
-  registerMatchmakingHandlers,
   enqueuePlayer,
+  getQueueSummary,
+  getSupportedModes,
+  registerMatchmakingHandlers,
   removeQueuedPlayer,
 };

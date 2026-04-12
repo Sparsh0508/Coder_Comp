@@ -1,5 +1,37 @@
 const mongoose = require("mongoose");
 
+const walletTransactionSchema = new mongoose.Schema(
+  {
+    type: {
+      type: String,
+      enum: ["deposit", "withdrawal", "match_entry", "match_reward", "refund"],
+      required: true,
+    },
+    rupeesAmount: {
+      type: Number,
+      default: 0,
+    },
+    coinsAmount: {
+      type: Number,
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ["completed", "pending", "failed"],
+      default: "completed",
+    },
+    note: {
+      type: String,
+      default: "",
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { _id: true }
+);
+
 const userSchema = new mongoose.Schema(
   {
     username: {
@@ -16,6 +48,17 @@ const userSchema = new mongoose.Schema(
       unique: true,
       trim: true,
       lowercase: true,
+    },
+    avatarUrl: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    bio: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: 240,
     },
     passwordHash: {
       type: String,
@@ -36,6 +79,15 @@ const userSchema = new mongoose.Schema(
     totalMatches: {
       type: Number,
       default: 0,
+    },
+    coinBalance: {
+      type: Number,
+      default: 500,
+      min: 0,
+    },
+    walletTransactions: {
+      type: [walletTransactionSchema],
+      default: [],
     },
   },
   {

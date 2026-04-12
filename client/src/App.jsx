@@ -7,7 +7,11 @@ import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import DashboardPage from "./pages/DashboardPage";
 import MatchmakingPage from "./pages/MatchmakingPage";
+import MatchLobbyPage from "./pages/MatchLobbyPage";
 import MatchRoomPage from "./pages/MatchRoomPage";
+import MatchResultPage from "./pages/MatchResultPage";
+import ProfilePage from "./pages/ProfilePage";
+import WalletPage from "./pages/WalletPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 
 function App() {
@@ -28,7 +32,11 @@ function App() {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/matchmaking" element={<MatchmakingPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/wallet" element={<WalletPage />} />
+            <Route path="/match/:matchId/lobby" element={<MatchLobbyPage />} />
             <Route path="/match/:matchId" element={<MatchRoomPage />} />
+            <Route path="/match/:matchId/result" element={<MatchResultPage />} />
             <Route path="/leaderboard" element={<LeaderboardPage />} />
           </Route>
 

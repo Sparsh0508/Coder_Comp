@@ -1,6 +1,7 @@
 async function createLocalSubmission({ sourceCode, language, stdin }) {
   const baseUrl = process.env.CODE_RUNNER_URL || "http://localhost:5001";
-
+  console.log(baseUrl);
+  
   const response = await fetch(`${baseUrl}/api/execute`, {
     method: "POST",
     headers: {
