@@ -18,22 +18,29 @@ async function runCpp(code, input = "") {
     const inputPath = path.join(dir, "input.txt");
     fs.writeFileSync(inputPath, input);
 
+    const dockerPath = dir.replace(/\\/g, "/");
+
     const dockerCommand = [
       "run",
       "--rm",
+      "--init",
       "--memory=200m",
       "--cpus=0.5",
       "--network=none",
       "--pids-limit=50",
       "-v",
-      `${dir}:/app`,
-      "gcc:latest",
+      `${dockerPath}:/app`,
+      "-w",
+      "/app",
+      "gcc:13",
       "sh",
       "-c",
-      "g++ /app/main.cpp -o /app/main && /app/main < /app/input.txt"
+      "g++ -std=c++17 /app/main.cpp -O2 -o /app/main && /app/main < /app/input.txt"
     ];
 
-    const run = spawn("docker", dockerCommand);
+    const run = spawn("docker", dockerCommand, {
+      stdio: ["ignore", "pipe", "pipe"]
+    });
 
     let stdout = "";
     let stderr = "";
@@ -45,7 +52,7 @@ async function runCpp(code, input = "") {
         cleanup();
         resolve({ status: "Time Limit Exceeded", output: "" });
       }
-    }, 5000);
+    }, 12000);
 
     run.stdout.on("data", (data) => {
       stdout += data.toString();
@@ -72,6 +79,19 @@ async function runCpp(code, input = "") {
       resolve({
         status: "Success",
         output: stdout.trim()
+      });
+    });
+
+    run.on("error", (err) => {
+      if (finished) return;
+      finished = true;
+
+      clearTimeout(timeout);
+      cleanup();
+
+      resolve({
+        status: "Internal Error",
+        output: err.message
       });
     });
 

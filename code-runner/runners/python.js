@@ -45,7 +45,7 @@ async function runPython(code, input) {
     let stdout = "";
     let stderr = "";
 
-    // ⏱ Timeout (3 sec)
+    // Give the container enough time to start on local Docker, especially on first runs.
     const timeout = setTimeout(() => {
       if (!finished) {
         finished = true;
@@ -53,7 +53,7 @@ async function runPython(code, input) {
         cleanup();
         return resolve({ status: "Time Limit Exceeded" });
       }
-    }, 3000); 
+    }, 10000); 
 
     // ✅ Input handling
     if (input) {
