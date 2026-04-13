@@ -355,6 +355,7 @@ function buildMatchEndPayload(match, winningTeam, reason, rewardSummary = {}) {
 function registerMatchmakingHandlers(io) {
   io.on("connection", (socket) => {
     connectedUsers.set(socket.user.id, socket.id);
+    socket.join(`user:${socket.user.id}`);
 
     socket.on("joinQueue", async ({ mode } = {}) => {
       try {

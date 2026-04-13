@@ -49,18 +49,29 @@ async function awardPrizePool(match, winningTeam) {
   let remainder = match.prizePool % winnerUsers.length;
 
   await Promise.all(
-    winnerUsers.map((user) => {
+    winnerUsers.map(async (user) => {
       const reward = baseReward + (remainder > 0 ? 1 : 0);
       remainder = Math.max(0, remainder - 1);
-      user.coinBalance += reward;
-      user.walletTransactions.unshift({
-        type: "match_reward",
-        rupeesAmount: 0,
-        coinsAmount: reward,
-        status: "completed",
-        note: "Prize pool reward",
-      });
-      return user.save();
+      await User.updateOne(
+        { _id: user._id },
+        {
+          $inc: { coinBalance: reward },
+          $push: {
+            walletTransactions: {
+              $each: [
+                {
+                  type: "match_reward",
+                  rupeesAmount: 0,
+                  coinsAmount: reward,
+                  status: "completed",
+                  note: "Prize pool reward",
+                },
+              ],
+              $position: 0,
+            },
+          },
+        }
+      );
     })
   );
 

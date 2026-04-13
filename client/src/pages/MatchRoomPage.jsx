@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import EditorPanel from "../components/EditorPanel";
 import OpponentPanel from "../components/OpponentPanel";
@@ -32,6 +32,7 @@ function formatResultOutput(result) {
 
 function MatchRoomPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { matchId } = useParams();
   const { user, refreshUser, updateUser } = useAuth();
   const [match, setMatch] = useState(null);
@@ -41,6 +42,7 @@ function MatchRoomPage() {
   const [running, setRunning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
+  const [notice, setNotice] = useState(location.state?.notice || "");
   const loadedMatchIdRef = useRef(null);
   const hasNavigatedToResultRef = useRef(false);
 
@@ -125,6 +127,14 @@ function MatchRoomPage() {
       }
     },
   });
+
+  useEffect(() => {
+    const storedNotice = window.sessionStorage.getItem("match_notice");
+    if (storedNotice) {
+      setNotice(storedNotice);
+      window.sessionStorage.removeItem("match_notice");
+    }
+  }, []);
 
   useEffect(() => {
     if (loadedMatchIdRef.current === matchId) {
@@ -263,6 +273,11 @@ function MatchRoomPage() {
   return (
     <>
       <ResultBanner result={result} userId={user?.id} userTeam={match?.currentPlayer?.team} />
+      {notice ? (
+        <div className="mb-4 rounded-2xl border border-arena-500/30 bg-arena-500/10 px-4 py-3 text-sm text-arena-200">
+          {notice}
+        </div>
+      ) : null}
 
       <div className="grid h-full gap-4 xl:grid-cols-[0.92fr_1.08fr]">
         <div className="min-h-0">

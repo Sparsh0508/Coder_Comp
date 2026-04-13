@@ -72,18 +72,24 @@ function MatchResultPage() {
 
   useEffect(() => {
     const countdownInterval = window.setInterval(() => {
-      setSecondsLeft((current) => {
-        if (current <= 1) {
-          window.clearInterval(countdownInterval);
-          navigate("/dashboard", { replace: true });
-          return 0;
-        }
-
-        return current - 1;
-      });
+      setSecondsLeft((current) => Math.max(current - 1, 0));
     }, 1000);
 
     return () => window.clearInterval(countdownInterval);
+  }, []);
+
+  useEffect(() => {
+    if (secondsLeft <= 0) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [navigate, secondsLeft]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      navigate("/dashboard", { replace: true });
+    }, 6000);
+
+    return () => window.clearTimeout(timeoutId);
   }, [navigate]);
 
   const transientResult = location.state?.result || null;

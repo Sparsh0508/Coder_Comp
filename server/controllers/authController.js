@@ -1,6 +1,7 @@
 const bcrypt = require("bcrypt");
 
 const User = require("../models/User");
+const { forfeitMatchByUser } = require("../utils/matchForfeit");
 const {
   createRazorpayContact,
   createRazorpayFundAccount,
@@ -108,6 +109,25 @@ async function login(req, res, next) {
     if (STRICT_SINGLE_SESSION) {
       user.sessionVersion += 1;
       await user.save();
+
+      const io = req.app.get("io");
+      if (io) {
+        io.to(`user:${user._id.toString()}`).emit("sessionInvalidated", {
+          message: "Your account has been logged in on another device.",
+        });
+        io.in(`user:${user._id.toString()}`).disconnectSockets(true);
+      }
+
+      if (user.activeMatchId) {
+        await forfeitMatchByUser({
+          io,
+          matchId: user.activeMatchId,
+          userId: user._id.toString(),
+          reason: "Player logged in from another device",
+        });
+        user.activeMatchId = null;
+        user.activeMatchStatus = "available";
+      }
     }
 
     const token = signToken(buildTokenPayload(user));

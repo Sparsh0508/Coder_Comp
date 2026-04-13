@@ -1,15 +1,22 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import AuthForm from "../components/AuthForm";
 import { useAuth } from "../context/AuthContext";
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, consumeSessionNotice } = useAuth();
   const [values, setValues] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const notice = consumeSessionNotice();
+    if (notice) {
+      setError(notice);
+    }
+  }, [consumeSessionNotice]);
 
   const handleChange = (event) => {
     setValues((current) => ({ ...current, [event.target.name]: event.target.value }));

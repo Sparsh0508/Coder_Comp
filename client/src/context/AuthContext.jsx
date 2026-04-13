@@ -5,6 +5,7 @@ import {
   createDepositOrder as createDepositOrderRequest,
   depositCoins as depositCoinsRequest,
   getCurrentUser,
+  getSocketToken,
   getWallet as getWalletRequest,
   loginUser,
   logoutUser,
@@ -13,13 +14,14 @@ import {
   verifyDepositOrder as verifyDepositOrderRequest,
   withdrawCoins as withdrawCoinsRequest,
 } from "../services/authService";
-import { disconnectSocket } from "../services/socket";
+import { disconnectSocket, getSocket } from "../services/socket";
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [sessionNotice, setSessionNotice] = useState("");
   const hasLoadedUserRef = useRef(false);
 
   useEffect(() => {
@@ -35,6 +37,48 @@ export function AuthProvider({ children }) {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const socket = getSocket();
+    let isActive = true;
+
+    async function connectSocket() {
+      try {
+        const response = await getSocketToken();
+        socket.auth = { token: response.token };
+        socket.io.opts.query = { token: response.token };
+      } catch {
+        return;
+      }
+
+      if (!socket.connected) {
+        socket.connect();
+      }
+    }
+
+    const handleSessionInvalidated = (payload) => {
+      const message = payload?.message || "Your account has been logged in on another device.";
+      if (!isActive) {
+        return;
+      }
+      window.sessionStorage.setItem("session_notice", message);
+      setSessionNotice(message);
+      disconnectSocket();
+      setUser(null);
+    };
+
+    connectSocket();
+    socket.on("sessionInvalidated", handleSessionInvalidated);
+
+    return () => {
+      isActive = false;
+      socket.off("sessionInvalidated", handleSessionInvalidated);
+    };
+  }, [user]);
+
   const refreshUser = async () => {
     const response = await getCurrentUser();
     setUser(response.user);
@@ -43,12 +87,14 @@ export function AuthProvider({ children }) {
 
   const login = async (payload) => {
     const response = await loginUser(payload);
+    disconnectSocket();
     setUser(response.user);
     return response;
   };
 
   const register = async (payload) => {
     const response = await registerUser(payload);
+    disconnectSocket();
     setUser(response.user);
     return response;
   };
@@ -57,6 +103,20 @@ export function AuthProvider({ children }) {
     await logoutUser();
     disconnectSocket();
     setUser(null);
+  };
+
+  const consumeSessionNotice = () => {
+    const stored = window.sessionStorage.getItem("session_notice");
+    if (stored) {
+      window.sessionStorage.removeItem("session_notice");
+      setSessionNotice("");
+      return stored;
+    }
+    if (sessionNotice) {
+      setSessionNotice("");
+      return sessionNotice;
+    }
+    return "";
   };
 
   const updateUser = (patch) => {
@@ -111,6 +171,8 @@ export function AuthProvider({ children }) {
         createDepositOrder,
         verifyDepositOrder,
         withdrawCoins,
+        sessionNotice,
+        consumeSessionNotice,
       }}
     >
       {children}

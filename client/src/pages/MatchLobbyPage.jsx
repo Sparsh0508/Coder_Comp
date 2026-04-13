@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
 import useCountdown from "../hooks/useCountdown";
@@ -33,11 +33,13 @@ function PlayerLobbyCard({ title, players, accentClass }) {
 
 function MatchLobbyPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { matchId } = useParams();
   const { refreshUser, updateUser, user } = useAuth();
   const [match, setMatch] = useState(null);
   const [message, setMessage] = useState("Preparing the arena...");
   const [cancelled, setCancelled] = useState(false);
+  const [notice, setNotice] = useState(location.state?.notice || "");
   const loadedMatchIdRef = useRef(null);
 
   useMatchSocket({
@@ -57,6 +59,14 @@ function MatchLobbyPage() {
       refreshUser().catch(() => {});
     },
   });
+
+  useEffect(() => {
+    const storedNotice = window.sessionStorage.getItem("match_notice");
+    if (storedNotice) {
+      setNotice(storedNotice);
+      window.sessionStorage.removeItem("match_notice");
+    }
+  }, []);
 
   useEffect(() => {
     if (loadedMatchIdRef.current === matchId) {
@@ -112,7 +122,13 @@ function MatchLobbyPage() {
 
   return (
     <div className="mx-auto flex h-full max-w-7xl items-center justify-center">
-      <div className="grid w-full gap-6 xl:grid-cols-[1fr_0.9fr_1fr]">
+      <div className="grid w-full gap-6">
+        {notice ? (
+          <div className="rounded-2xl border border-arena-500/30 bg-arena-500/10 px-4 py-3 text-sm text-arena-200">
+            {notice}
+          </div>
+        ) : null}
+        <div className="grid w-full gap-6 xl:grid-cols-[1fr_0.9fr_1fr]">
         <PlayerLobbyCard title="Your Side" players={yourTeam} accentClass="text-arena-400" />
 
         <section className="arena-chest arena-chest-glow flex flex-col items-center justify-center p-8 text-center">
@@ -144,6 +160,7 @@ function MatchLobbyPage() {
         </section>
 
         <PlayerLobbyCard title="Opposing Side" players={opposingTeam} accentClass="text-flame-400" />
+        </div>
       </div>
     </div>
   );

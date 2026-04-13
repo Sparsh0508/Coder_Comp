@@ -19,7 +19,8 @@ async function authenticateSocket(socket, next) {
     const bearer = socket.handshake.headers.authorization;
     const bearerToken = bearer?.startsWith("Bearer ") ? bearer.slice(7) : null;
     const authToken = socket.handshake.auth?.token;
-    const token = authToken || bearerToken || cookies.token;
+    const queryToken = socket.handshake.query?.token;
+    const token = authToken || queryToken || bearerToken || cookies.token;
 
     if (!token) {
       return next(new Error("Socket authentication failed"));

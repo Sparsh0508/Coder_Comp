@@ -1,4 +1,5 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useRef } from "react";
 import { CircleUserRound, Crown, LogOut, Swords, Trophy, Wallet } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
@@ -16,6 +17,27 @@ function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const isMatchRoute = location.pathname.startsWith("/match/");
+  const redirectRef = useRef(false);
+
+  useEffect(() => {
+    if (!user?.activeMatchId || isMatchRoute) {
+      redirectRef.current = false;
+      return;
+    }
+
+    if (redirectRef.current) {
+      return;
+    }
+
+    const target =
+      user.activeMatchStatus === "lobby"
+        ? `/match/${user.activeMatchId}/lobby`
+        : `/match/${user.activeMatchId}`;
+    const notice = "Contest already in progress. Redirecting you to your active match…";
+    window.sessionStorage.setItem("match_notice", notice);
+    redirectRef.current = true;
+    navigate(target, { replace: true, state: { notice } });
+  }, [isMatchRoute, navigate, user?.activeMatchId, user?.activeMatchStatus]);
 
   const handleLogout = async () => {
     await logout();
