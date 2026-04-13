@@ -1,6 +1,8 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 
 import {
+  createDepositOrder as createDepositOrderRequest,
   depositCoins as depositCoinsRequest,
   getCurrentUser,
   getWallet as getWalletRequest,
@@ -8,6 +10,7 @@ import {
   logoutUser,
   registerUser,
   updateProfile as updateProfileRequest,
+  verifyDepositOrder as verifyDepositOrderRequest,
   withdrawCoins as withdrawCoinsRequest,
 } from "../services/authService";
 import { disconnectSocket } from "../services/socket";
@@ -76,6 +79,16 @@ export function AuthProvider({ children }) {
     return response;
   };
 
+  const createDepositOrder = async (payload) => {
+    return createDepositOrderRequest(payload);
+  };
+
+  const verifyDepositOrder = async (payload) => {
+    const response = await verifyDepositOrderRequest(payload);
+    setUser(response.user);
+    return response;
+  };
+
   const withdrawCoins = async (payload) => {
     const response = await withdrawCoinsRequest(payload);
     setUser(response.user);
@@ -95,6 +108,8 @@ export function AuthProvider({ children }) {
         updateProfile,
         getWallet,
         depositCoins,
+        createDepositOrder,
+        verifyDepositOrder,
         withdrawCoins,
       }}
     >

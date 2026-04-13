@@ -14,3 +14,8 @@ export async function getMatchById(matchId) {
   const { data } = await api.get(`/match/${matchId}`);
   return data;
 }
+
+export async function getActiveMatch() {
+  const { data } = await api.get("/match/active/current");
+  return data;
+}

@@ -16,6 +16,10 @@ module.exports = async function authMiddleware(req, res, next) {
       return res.status(401).json({ success: false, message: "Invalid session" });
     }
 
+    if ((payload.sessionVersion || 0) !== (user.sessionVersion || 0)) {
+      return res.status(401).json({ success: false, message: "Session expired. Please log in again." });
+    }
+
     req.user = user;
     return next();
   } catch (error) {

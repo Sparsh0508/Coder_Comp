@@ -1,6 +1,7 @@
 const Match = require("../models/Match");
 const Problem = require("../models/Problem");
 const { awardPrizePool, deductEntryCoins, refundEntryCoins } = require("../utils/matchEconomy");
+const { clearUsersActiveMatch, setUsersActiveMatch } = require("../utils/userMatchState");
 const {
   LOBBY_DURATION_MS,
   MATCH_DURATION_MS,
@@ -13,6 +14,16 @@ const {
 const matchmakingQueues = new Map(getSupportedModes().map((mode) => [mode, []]));
 const connectedUsers = new Map();
 const lobbyTimers = new Map();
+
+function getQueueCandidates(mode) {
+  return [...getQueue(mode)].sort((a, b) => {
+    if (a.rating === b.rating) {
+      return new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime();
+    }
+
+    return a.rating - b.rating;
+  });
+}
 
 function getQueue(mode) {
   return matchmakingQueues.get(mode) || matchmakingQueues.get("1v1");
@@ -68,6 +79,39 @@ function buildLobbyPayload(match) {
   };
 }
 
+function selectBalancedPlayers(mode) {
+  const queue = getQueue(mode);
+  const requiredPlayers = getRequiredPlayers(mode);
+
+  if (queue.length < requiredPlayers) {
+    return null;
+  }
+
+  const candidates = getQueueCandidates(mode);
+  let bestWindow = candidates.slice(0, requiredPlayers);
+  let bestSpread = bestWindow[bestWindow.length - 1].rating - bestWindow[0].rating;
+
+  for (let index = 1; index <= candidates.length - requiredPlayers; index += 1) {
+    const window = candidates.slice(index, index + requiredPlayers);
+    const spread = window[window.length - 1].rating - window[0].rating;
+
+    if (spread < bestSpread) {
+      bestWindow = window;
+      bestSpread = spread;
+    }
+  }
+
+  const selectedUserIds = new Set(bestWindow.map((player) => player.userId));
+
+  for (let index = queue.length - 1; index >= 0; index -= 1) {
+    if (selectedUserIds.has(queue[index].userId)) {
+      queue.splice(index, 1);
+    }
+  }
+
+  return bestWindow;
+}
+
 function scheduleLobbyStart(io, matchId) {
   if (lobbyTimers.has(matchId)) {
     clearTimeout(lobbyTimers.get(matchId));
@@ -83,6 +127,11 @@ function scheduleLobbyStart(io, matchId) {
 
       match.status = "active";
       await match.save();
+      await setUsersActiveMatch(
+        match.players.map((player) => (player.user._id || player.user).toString()),
+        match._id,
+        "active"
+      );
 
       io.to(match.roomId).emit("matchStarted", {
         matchId: match._id.toString(),
@@ -164,6 +213,12 @@ async function createMatch(io, queuedPlayers, mode) {
     .populate("problem")
     .populate("players.user", "username rating coinBalance");
 
+  await setUsersActiveMatch(
+    queuedPlayers.map((player) => player.userId),
+    hydratedMatch._id,
+    "lobby"
+  );
+
   queuedPlayers.forEach(({ socketId }) => {
     const socket = io.sockets.sockets.get(socketId);
     if (socket) {
@@ -207,11 +262,14 @@ async function createMatch(io, queuedPlayers, mode) {
 
 async function maybeCreateMatch(io) {
   for (const mode of getSupportedModes()) {
-    const queue = getQueue(mode);
     const requiredPlayers = getRequiredPlayers(mode);
 
-    while (queue.length >= requiredPlayers) {
-      const players = queue.splice(0, requiredPlayers);
+    while (getQueue(mode).length >= requiredPlayers) {
+      const players = selectBalancedPlayers(mode);
+      if (!players) {
+        break;
+      }
+
       await createMatch(io, players, mode);
       emitQueueUpdate(io, mode);
     }
@@ -231,7 +289,7 @@ async function enqueuePlayer(io, player) {
 
     if (existingMode !== mode) {
       removeQueuedPlayer(player.userId);
-      queue.push({ ...player, mode });
+      queue.push({ ...player, mode, joinedAt: new Date().toISOString() });
       emitQueueUpdate(io, existingMode);
       emitQueueUpdate(io, mode);
       await maybeCreateMatch(io);
@@ -253,7 +311,7 @@ async function enqueuePlayer(io, player) {
     };
   }
 
-  queue.push({ ...player, mode });
+  queue.push({ ...player, mode, joinedAt: new Date().toISOString() });
   emitQueueUpdate(io, mode);
   await maybeCreateMatch(io);
 
@@ -371,6 +429,7 @@ function registerMatchmakingHandlers(io) {
         match.endedAt = new Date();
         await refundEntryCoins(match);
         await match.save();
+        await clearUsersActiveMatch(match.players.map((player) => player.user._id.toString()));
 
         io.to(match.roomId).emit("matchCancelled", {
           matchId: match._id.toString(),
@@ -400,6 +459,7 @@ function registerMatchmakingHandlers(io) {
 
       const rewardSummary = await awardPrizePool(match, winningTeam);
       await match.save();
+      await clearUsersActiveMatch(match.players.map((player) => player.user._id.toString()));
 
       io.to(match.roomId).emit("matchEnd", buildMatchEndPayload(match, winningTeam, "Opponent disconnected", rewardSummary));
     });

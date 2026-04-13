@@ -35,6 +35,16 @@ export async function depositCoins(payload) {
   return data;
 }
 
+export async function createDepositOrder(payload) {
+  const { data } = await api.post("/auth/wallet/deposit/order", payload);
+  return data;
+}
+
+export async function verifyDepositOrder(payload) {
+  const { data } = await api.post("/auth/wallet/deposit/verify", payload);
+  return data;
+}
+
 export async function withdrawCoins(payload) {
   const { data } = await api.post("/auth/wallet/withdraw", payload);
   return data;

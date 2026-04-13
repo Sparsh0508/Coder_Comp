@@ -3,8 +3,23 @@ import { ArrowDownLeft, ArrowUpRight, Coins, IndianRupee } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
 
+async function loadRazorpayCheckout() {
+  if (window.Razorpay) {
+    return true;
+  }
+
+  return new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
+
 function WalletPage() {
-  const { user, getWallet, depositCoins, withdrawCoins } = useAuth();
+  const { user, getWallet, createDepositOrder, depositCoins, verifyDepositOrder, withdrawCoins } = useAuth();
   const [wallet, setWallet] = useState(null);
   const [depositRupees, setDepositRupees] = useState("10");
   const [withdrawCoinsValue, setWithdrawCoinsValue] = useState("100");
@@ -30,6 +45,7 @@ function WalletPage() {
 
   const depositPreview = useMemo(() => Math.round((Number(depositRupees || 0) / 10) * 100), [depositRupees]);
   const withdrawPreview = useMemo(() => Number(((Number(withdrawCoinsValue || 0) / 100) * 10).toFixed(2)), [withdrawCoinsValue]);
+  const canUseRazorpay = Boolean(wallet?.razorpayKeyId);
 
   const refreshWallet = async () => {
     const response = await getWallet();
@@ -43,9 +59,57 @@ function WalletPage() {
     setError("");
 
     try {
-      const response = await depositCoins({ rupeesAmount: Number(depositRupees) });
-      setMessage(response.message);
-      await refreshWallet();
+      if (!canUseRazorpay) {
+        const response = await depositCoins({ rupeesAmount: Number(depositRupees) });
+        setMessage(response.message);
+        await refreshWallet();
+        return;
+      }
+
+      const checkoutLoaded = await loadRazorpayCheckout();
+
+      if (!checkoutLoaded) {
+        throw new Error("Unable to load Razorpay checkout");
+      }
+
+      const orderResponse = await createDepositOrder({ rupeesAmount: Number(depositRupees) });
+
+      await new Promise((resolve, reject) => {
+        const razorpay = new window.Razorpay({
+          key: orderResponse.order.keyId,
+          amount: orderResponse.order.amount,
+          currency: orderResponse.order.currency,
+          order_id: orderResponse.order.id,
+          name: "CodeCamp Arena",
+          description: "Wallet coin deposit",
+          handler: async (paymentResult) => {
+            try {
+              const verifyResponse = await verifyDepositOrder({
+                razorpayOrderId: paymentResult.razorpay_order_id,
+                razorpayPaymentId: paymentResult.razorpay_payment_id,
+                razorpaySignature: paymentResult.razorpay_signature,
+              });
+              setMessage(verifyResponse.message);
+              await refreshWallet();
+              resolve();
+            } catch (verificationError) {
+              reject(verificationError);
+            }
+          },
+          modal: {
+            ondismiss: () => reject(new Error("Payment was cancelled")),
+          },
+          prefill: {
+            name: user?.username,
+            email: user?.email,
+          },
+          theme: {
+            color: "#3dd9b8",
+          },
+        });
+
+        razorpay.open();
+      });
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -105,6 +169,9 @@ function WalletPage() {
           <div className="mt-4 rounded-2xl border border-white/10 bg-black/15 p-4 text-sm text-paper-200/70">
             <IndianRupee size={16} className="mb-2 text-paper-200/50" />
             You will receive approximately <span className="font-semibold text-arena-400">{depositPreview} coins</span>.
+            <div className="mt-2 text-paper-200/55">
+              {canUseRazorpay ? "Secure checkout via Razorpay with server-side verification." : "Using local deposit mode. Add Razorpay keys to enable live payments."}
+            </div>
           </div>
           <button className="arena-button-primary mt-6" type="submit" disabled={depositing}>
             {depositing ? "Depositing..." : "Add Coins"}

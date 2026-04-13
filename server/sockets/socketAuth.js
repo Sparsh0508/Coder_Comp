@@ -29,6 +29,10 @@ async function authenticateSocket(socket, next) {
       return next(new Error("Socket authentication failed"));
     }
 
+    if ((payload.sessionVersion || 0) !== (user.sessionVersion || 0)) {
+      return next(new Error("Socket authentication failed"));
+    }
+
     socket.user = {
       id: user._id.toString(),
       username: user.username,

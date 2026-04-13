@@ -75,6 +75,15 @@ async function findMatch(req, res, next) {
       });
     }
 
+    if (req.user.activeMatchId && req.user.activeMatchStatus !== "available") {
+      return res.status(409).json({
+        success: false,
+        message: "You already have an active match. Rejoin the ongoing match instead.",
+        activeMatchId: req.user.activeMatchId,
+        activeMatchStatus: req.user.activeMatchStatus,
+      });
+    }
+
     const problemCount = await Problem.countDocuments();
     if (!problemCount) {
       return res.status(400).json({ success: false, message: "No problems are available. Seed the database first." });
@@ -111,6 +120,18 @@ async function leaveQueue(req, res, next) {
   }
 }
 
+async function getActiveMatch(req, res) {
+  return res.status(200).json({
+    success: true,
+    activeMatch: req.user.activeMatchId
+      ? {
+          matchId: req.user.activeMatchId,
+          status: req.user.activeMatchStatus,
+        }
+      : null,
+  });
+}
+
 async function getMatch(req, res, next) {
   try {
     const match = await Match.findById(req.params.matchId)
@@ -141,4 +162,5 @@ module.exports = {
   findMatch,
   leaveQueue,
   getMatch,
+  getActiveMatch,
 };

@@ -4,7 +4,9 @@ const matchModes = [
   { value: "4v4", label: "4v4", description: "Full squad clash" },
 ];
 
-function QueueStatusCard({ queueState, selectedMode, entryCoins, onModeChange, onFindMatch, onCancel }) {
+function QueueStatusCard({ queueState, selectedMode, entryCoins, onModeChange, onFindMatch, onCancel, activeMatch }) {
+  const hasActiveMatch = Boolean(activeMatch?.matchId);
+
   return (
     <div className="arena-panel p-8">
       <div className="mb-4 inline-flex rounded-full border border-flame-400/25 bg-flame-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-flame-400">
@@ -24,7 +26,7 @@ function QueueStatusCard({ queueState, selectedMode, entryCoins, onModeChange, o
               key={mode.value}
               type="button"
               onClick={() => onModeChange(mode.value)}
-              disabled={queueState.searching}
+              disabled={queueState.searching || hasActiveMatch}
               className={`rounded-2xl border p-4 text-left transition ${
                 isActive
                   ? "border-arena-500/60 bg-arena-500/10"
@@ -40,7 +42,11 @@ function QueueStatusCard({ queueState, selectedMode, entryCoins, onModeChange, o
 
       <div className="mt-6 flex flex-wrap gap-4">
         <button className="arena-button-primary" onClick={onFindMatch} disabled={queueState.searching}>
-          {queueState.searching ? `Searching ${selectedMode}...` : `Find ${selectedMode} Match`}
+          {hasActiveMatch
+            ? "Resume Active Match"
+            : queueState.searching
+              ? `Searching ${selectedMode}...`
+              : `Find ${selectedMode} Match`}
         </button>
         <button className="arena-button-secondary" onClick={onCancel} disabled={!queueState.searching}>
           Leave Queue
@@ -50,7 +56,7 @@ function QueueStatusCard({ queueState, selectedMode, entryCoins, onModeChange, o
       <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-2xl border border-white/10 bg-arena-900/70 p-4">
           <div className="text-sm text-paper-200/55">Queue status</div>
-          <div className="mt-2 text-xl font-semibold">{queueState.searching ? "In queue" : "Idle"}</div>
+          <div className="mt-2 text-xl font-semibold">{hasActiveMatch ? "In match" : queueState.searching ? "In queue" : "Idle"}</div>
         </div>
         <div className="rounded-2xl border border-white/10 bg-arena-900/70 p-4">
           <div className="text-sm text-paper-200/55">Mode / waiting</div>
@@ -70,7 +76,11 @@ function QueueStatusCard({ queueState, selectedMode, entryCoins, onModeChange, o
         </div>
         <div className="rounded-2xl border border-white/10 bg-arena-900/70 p-4">
           <div className="text-sm text-paper-200/55">Message</div>
-          <div className="mt-2 text-base font-semibold">{queueState.message || "Queue up to begin."}</div>
+          <div className="mt-2 text-base font-semibold">
+            {hasActiveMatch
+              ? `You already have a ${activeMatch.status} match in progress.`
+              : queueState.message || "Queue up to begin."}
+          </div>
         </div>
       </div>
     </div>

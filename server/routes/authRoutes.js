@@ -7,10 +7,12 @@ const router = express.Router();
 
 router.post("/register", authController.register);
 router.post("/login", authController.login);
-router.post("/logout", authController.logout);
+router.post("/logout", authMiddleware, authController.logout);
 router.get("/me", authMiddleware, authController.me);
 router.put("/profile", authMiddleware, authController.updateProfile);
 router.get("/wallet", authMiddleware, authController.getWallet);
+router.post("/wallet/deposit/order", authMiddleware, authController.createDepositOrder);
+router.post("/wallet/deposit/verify", authMiddleware, authController.verifyDepositOrder);
 router.post("/wallet/deposit", authMiddleware, authController.depositCoins);
 router.post("/wallet/withdraw", authMiddleware, authController.withdrawCoins);
 

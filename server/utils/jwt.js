@@ -12,6 +12,13 @@ function signToken(payload) {
   });
 }
 
+function buildTokenPayload(user) {
+  return {
+    userId: user._id.toString(),
+    sessionVersion: user.sessionVersion || 0,
+  };
+}
+
 function verifyToken(token) {
   const secret = process.env.JWT_SECRET;
 
@@ -23,6 +30,7 @@ function verifyToken(token) {
 }
 
 module.exports = {
+  buildTokenPayload,
   signToken,
   verifyToken,
 };

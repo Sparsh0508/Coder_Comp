@@ -3,6 +3,7 @@ const Problem = require("../models/Problem");
 const Submission = require("../models/Submission");
 const User = require("../models/User");
 const { awardPrizePool } = require("../utils/matchEconomy");
+const { clearUsersActiveMatch } = require("../utils/userMatchState");
 const { evaluateCode } = require("../utils/executor");
 const { calculateElo } = require("../utils/elo");
 
@@ -193,6 +194,7 @@ async function submitCode(req, res, next) {
     });
 
     if (winnerUserId) {
+      await clearUsersActiveMatch(match.players.map((entry) => entry.user._id.toString()));
       io.to(match.roomId).emit("matchEnd", buildMatchSummary(match, winnerUserId, winnerTeam, rewardSummary));
     }
 

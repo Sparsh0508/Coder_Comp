@@ -1,9 +1,11 @@
 const bcrypt = require("bcrypt");
 
 const User = require("../models/User");
-const { signToken } = require("../utils/jwt");
+const { createRazorpayOrder, ensureRazorpayConfigured, getRazorpayConfig, verifyRazorpaySignature } = require("../utils/razorpay");
+const { buildTokenPayload, signToken } = require("../utils/jwt");
 const { setAuthCookie, clearAuthCookie } = require("../utils/cookies");
 const { coinsToRupees, MIN_WITHDRAW_COINS, rupeesToCoins } = require("../utils/wallet");
+const STRICT_SINGLE_SESSION = process.env.STRICT_SINGLE_SESSION === "true";
 
 function sanitizeUser(user) {
   return {
@@ -17,6 +19,8 @@ function sanitizeUser(user) {
     losses: user.losses,
     totalMatches: user.totalMatches,
     coinBalance: user.coinBalance,
+    activeMatchId: user.activeMatchId,
+    activeMatchStatus: user.activeMatchStatus,
   };
 }
 
@@ -28,6 +32,9 @@ function formatWalletTransaction(transaction) {
     coinsAmount: transaction.coinsAmount,
     status: transaction.status,
     note: transaction.note,
+    provider: transaction.provider,
+    referenceId: transaction.referenceId,
+    paymentId: transaction.paymentId,
     createdAt: transaction.createdAt,
   };
 }
@@ -56,7 +63,7 @@ async function register(req, res, next) {
       passwordHash,
     });
 
-    const token = signToken({ userId: user._id.toString() });
+    const token = signToken(buildTokenPayload(user));
     setAuthCookie(res, token);
 
     return res.status(201).json({
@@ -89,7 +96,12 @@ async function login(req, res, next) {
       return res.status(401).json({ success: false, message: "Invalid credentials" });
     }
 
-    const token = signToken({ userId: user._id.toString() });
+    if (STRICT_SINGLE_SESSION) {
+      user.sessionVersion += 1;
+      await user.save();
+    }
+
+    const token = signToken(buildTokenPayload(user));
     setAuthCookie(res, token);
 
     return res.status(200).json({
@@ -153,10 +165,14 @@ async function updateProfile(req, res, next) {
 }
 
 async function getWallet(req, res) {
+  const paymentConfig = getRazorpayConfig();
+
   return res.status(200).json({
     success: true,
     wallet: {
       coinBalance: req.user.coinBalance,
+      paymentProvider: paymentConfig.keyId ? "razorpay" : "manual",
+      razorpayKeyId: paymentConfig.keyId || null,
       conversion: {
         rupeesPer100Coins: 10,
         coinsPer10Rupees: 100,
@@ -167,6 +183,109 @@ async function getWallet(req, res) {
         .map(formatWalletTransaction),
     },
   });
+}
+
+async function createDepositOrder(req, res, next) {
+  try {
+    ensureRazorpayConfigured();
+
+    const rupeesAmount = Number(req.body.rupeesAmount);
+
+    if (!Number.isFinite(rupeesAmount) || rupeesAmount <= 0) {
+      return res.status(400).json({ success: false, message: "Enter a valid rupee amount" });
+    }
+
+    const coinsAmount = rupeesToCoins(rupeesAmount);
+    const receipt = `dep_${req.user._id}_${Date.now()}`;
+    const order = await createRazorpayOrder({
+      amountInRupees: rupeesAmount,
+      receipt,
+      notes: {
+        userId: req.user._id.toString(),
+        coinsAmount: String(coinsAmount),
+      },
+    });
+
+    req.user.walletTransactions.unshift({
+      type: "deposit",
+      rupeesAmount,
+      coinsAmount,
+      status: "pending",
+      note: `Awaiting payment verification for ${coinsAmount} coins`,
+      provider: "razorpay",
+      referenceId: order.id,
+    });
+    await req.user.save();
+
+    return res.status(200).json({
+      success: true,
+      order: {
+        id: order.id,
+        amount: order.amount,
+        currency: order.currency,
+        receipt: order.receipt,
+        keyId: process.env.RAZORPAY_KEY_ID,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function verifyDepositOrder(req, res, next) {
+  try {
+    ensureRazorpayConfigured();
+
+    const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+
+    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+      return res.status(400).json({ success: false, message: "Payment verification fields are required" });
+    }
+
+    const isValidSignature = verifyRazorpaySignature({
+      orderId: razorpayOrderId,
+      paymentId: razorpayPaymentId,
+      signature: razorpaySignature,
+    });
+
+    if (!isValidSignature) {
+      return res.status(400).json({ success: false, message: "Payment verification failed" });
+    }
+
+    const transaction = req.user.walletTransactions.find(
+      (entry) => entry.referenceId === razorpayOrderId && entry.type === "deposit"
+    );
+
+    if (!transaction) {
+      return res.status(404).json({ success: false, message: "Pending payment transaction not found" });
+    }
+
+    if (transaction.status === "completed") {
+      return res.status(200).json({
+        success: true,
+        message: "Payment already verified",
+        user: sanitizeUser(req.user),
+      });
+    }
+
+    transaction.status = "completed";
+    transaction.paymentId = razorpayPaymentId;
+    transaction.note = `Verified Razorpay payment for ${transaction.coinsAmount} coins`;
+    req.user.coinBalance += transaction.coinsAmount;
+    await req.user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `${transaction.coinsAmount} coins added successfully`,
+      user: sanitizeUser(req.user),
+      wallet: {
+        coinBalance: req.user.coinBalance,
+        transaction: formatWalletTransaction(transaction),
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
 }
 
 async function depositCoins(req, res, next) {
@@ -251,9 +370,18 @@ async function withdrawCoins(req, res, next) {
   }
 }
 
-function logout(_req, res) {
+async function logout(req, res, next) {
+  try {
+    if (req.user && STRICT_SINGLE_SESSION) {
+      req.user.sessionVersion += 1;
+      await req.user.save();
+    }
+
   clearAuthCookie(res);
   return res.status(200).json({ success: true, message: "Logged out successfully" });
+  } catch (error) {
+    return next(error);
+  }
 }
 
 module.exports = {
@@ -263,6 +391,8 @@ module.exports = {
   logout,
   updateProfile,
   getWallet,
+  createDepositOrder,
+  verifyDepositOrder,
   depositCoins,
   withdrawCoins,
 };

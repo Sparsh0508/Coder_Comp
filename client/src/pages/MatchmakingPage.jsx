@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import QueueStatusCard from "../components/QueueStatusCard";
+import { useAuth } from "../context/AuthContext";
 import { getSocket } from "../services/socket";
-import { findMatch, leaveQueue } from "../services/matchService";
+import { findMatch, getActiveMatch, leaveQueue } from "../services/matchService";
 
 const entryCoinsByMode = {
   "1v1": 50,
@@ -13,7 +14,9 @@ const entryCoinsByMode = {
 
 function MatchmakingPage() {
   const navigate = useNavigate();
+  const { user, refreshUser } = useAuth();
   const [selectedMode, setSelectedMode] = useState("1v1");
+  const [activeMatch, setActiveMatch] = useState(null);
   const [queueState, setQueueState] = useState({
     searching: false,
     queueSize: 0,
@@ -22,6 +25,12 @@ function MatchmakingPage() {
     message: "Queue up to begin.",
     mode: "1v1",
   });
+
+  useEffect(() => {
+    getActiveMatch()
+      .then((response) => setActiveMatch(response.activeMatch))
+      .catch(() => setActiveMatch(null));
+  }, []);
 
   useEffect(() => {
     const socket = getSocket();
@@ -102,6 +111,11 @@ function MatchmakingPage() {
   }, [queueState.searching, selectedMode]);
 
   const handleFindMatch = async () => {
+    if (activeMatch?.matchId || user?.activeMatchId) {
+      navigate(`/match/${activeMatch?.matchId || user?.activeMatchId}`);
+      return;
+    }
+
     const socket = getSocket();
 
     if (!socket.connected) {
@@ -139,6 +153,11 @@ function MatchmakingPage() {
         mode: response.mode || selectedMode,
       }));
     } catch (error) {
+      if (error.message.includes("active match")) {
+        await refreshUser().catch(() => {});
+        const current = await getActiveMatch().catch(() => ({ activeMatch: null }));
+        setActiveMatch(current.activeMatch);
+      }
       setQueueState((current) => ({
         ...current,
         searching: false,
@@ -170,6 +189,7 @@ function MatchmakingPage() {
         onModeChange={setSelectedMode}
         onFindMatch={handleFindMatch}
         onCancel={handleCancel}
+        activeMatch={activeMatch || (user?.activeMatchId ? { matchId: user.activeMatchId, status: user.activeMatchStatus } : null)}
       />
       <div className="arena-panel p-8">
         <div className="mb-4 text-xs uppercase tracking-[0.25em] text-paper-200/45">How it works</div>

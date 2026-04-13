@@ -24,6 +24,18 @@ const walletTransactionSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    provider: {
+      type: String,
+      default: "",
+    },
+    referenceId: {
+      type: String,
+      default: "",
+    },
+    paymentId: {
+      type: String,
+      default: "",
+    },
     createdAt: {
       type: Date,
       default: Date.now,
@@ -84,6 +96,20 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 500,
       min: 0,
+    },
+    sessionVersion: {
+      type: Number,
+      default: 0,
+    },
+    activeMatchId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Match",
+      default: null,
+    },
+    activeMatchStatus: {
+      type: String,
+      enum: ["available", "lobby", "active"],
+      default: "available",
     },
     walletTransactions: {
       type: [walletTransactionSchema],
