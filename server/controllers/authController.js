@@ -370,6 +370,15 @@ async function withdrawCoins(req, res, next) {
   }
 }
 
+async function getSocketToken(req, res, next) {
+  try {
+    const token = signToken(buildTokenPayload(req.user), { expiresIn: "10m" });
+    return res.status(200).json({ success: true, token });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 async function logout(req, res, next) {
   try {
     if (req.user && STRICT_SINGLE_SESSION) {
@@ -395,4 +404,5 @@ module.exports = {
   verifyDepositOrder,
   depositCoins,
   withdrawCoins,
+  getSocketToken,
 };

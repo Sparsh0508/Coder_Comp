@@ -11,6 +11,7 @@ router.post("/logout", authMiddleware, authController.logout);
 router.get("/me", authMiddleware, authController.me);
 router.put("/profile", authMiddleware, authController.updateProfile);
 router.get("/wallet", authMiddleware, authController.getWallet);
+router.get("/socket-token", authMiddleware, authController.getSocketToken);
 router.post("/wallet/deposit/order", authMiddleware, authController.createDepositOrder);
 router.post("/wallet/deposit/verify", authMiddleware, authController.verifyDepositOrder);
 router.post("/wallet/deposit", authMiddleware, authController.depositCoins);

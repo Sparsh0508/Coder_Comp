@@ -40,6 +40,11 @@
   textarea {
     @apply outline-none;
   }
+
+  .monaco-editor,
+  .monaco-editor .overflow-guard {
+    border-radius: 0 0 1.5rem 1.5rem;
+  }
 }
 
 @layer components {

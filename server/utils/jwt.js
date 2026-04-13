@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 
-function signToken(payload) {
+function signToken(payload, options = {}) {
   const secret = process.env.JWT_SECRET;
 
   if (!secret) {
@@ -8,7 +8,7 @@ function signToken(payload) {
   }
 
   return jwt.sign(payload, secret, {
-    expiresIn: process.env.JWT_EXPIRES_IN || "7d",
+    expiresIn: options.expiresIn || process.env.JWT_EXPIRES_IN || "7d",
   });
 }
 

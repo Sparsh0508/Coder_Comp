@@ -16,7 +16,10 @@ function parseCookies(cookieHeader = "") {
 async function authenticateSocket(socket, next) {
   try {
     const cookies = parseCookies(socket.handshake.headers.cookie || "");
-    const token = cookies.token;
+    const bearer = socket.handshake.headers.authorization;
+    const bearerToken = bearer?.startsWith("Bearer ") ? bearer.slice(7) : null;
+    const authToken = socket.handshake.auth?.token;
+    const token = authToken || bearerToken || cookies.token;
 
     if (!token) {
       return next(new Error("Socket authentication failed"));

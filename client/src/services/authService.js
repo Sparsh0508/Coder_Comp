@@ -49,3 +49,8 @@ export async function withdrawCoins(payload) {
   const { data } = await api.post("/auth/wallet/withdraw", payload);
   return data;
 }
+
+export async function getSocketToken() {
+  const { data } = await api.get("/auth/socket-token");
+  return data;
+}

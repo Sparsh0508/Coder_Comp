@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import QueueStatusCard from "../components/QueueStatusCard";
 import { useAuth } from "../context/AuthContext";
+import { getSocketToken } from "../services/authService";
 import { getSocket } from "../services/socket";
 import { findMatch, getActiveMatch, leaveQueue } from "../services/matchService";
 
@@ -119,6 +120,14 @@ function MatchmakingPage() {
     const socket = getSocket();
 
     if (!socket.connected) {
+      if (!socket.auth?.token) {
+        try {
+          const response = await getSocketToken();
+          socket.auth = { token: response.token };
+        } catch (error) {
+          throw new Error(error.message || "Unable to authenticate realtime connection");
+        }
+      }
       socket.connect();
       await new Promise((resolve, reject) => {
         const timeoutId = window.setTimeout(() => reject(new Error("Unable to establish realtime connection")), 5000);
@@ -126,9 +135,9 @@ function MatchmakingPage() {
           window.clearTimeout(timeoutId);
           resolve();
         });
-        socket.once("connect_error", () => {
+        socket.once("connect_error", (error) => {
           window.clearTimeout(timeoutId);
-          reject(new Error("Realtime connection failed"));
+          reject(new Error(error?.message || "Realtime connection failed"));
         });
       });
     }

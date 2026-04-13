@@ -277,7 +277,7 @@ function MatchRoomPage() {
             currentPlayer={{ ...match.currentPlayer, username: user?.username, rating: user?.rating }}
             queueMessage={queueMessage}
           />
-          <div className="min-h-0">
+          <div className="min-h-0 lg:overflow-hidden">
             <EditorPanel
               language={language}
               code={code}

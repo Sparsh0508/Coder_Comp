@@ -6,7 +6,9 @@ export function getSocket() {
   if (!socket) {
     socket = io(import.meta.env.VITE_SOCKET_URL || "http://localhost:8080", {
       withCredentials: true,
-      autoConnect: true,
+      autoConnect: false,
+      reconnectionAttempts: 3,
+      reconnectionDelay: 800,
     });
   }
 

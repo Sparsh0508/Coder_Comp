@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { getSocketToken } from "../services/authService";
 import { getSocket } from "../services/socket";
 
 function useMatchSocket({ roomId, onLobbyUpdated, onMatchStarted, onMatchCancelled, onOpponentUpdate, onSubmissionResult, onMatchEnd }) {
@@ -9,9 +10,20 @@ function useMatchSocket({ roomId, onLobbyUpdated, onMatchStarted, onMatchCancell
   useEffect(() => {
     const socket = getSocket();
 
-    if (!socket.connected) {
-      socket.connect();
+    async function connectSocket() {
+      if (!socket.connected) {
+        if (!socket.auth?.token) {
+          try {
+            const response = await getSocketToken();
+            socket.auth = { token: response.token };
+          } catch {
+          }
+        }
+        socket.connect();
+      }
     }
+
+    connectSocket();
 
     function handleConnect() {
       setConnectionMessage("Connected to live arena.");
