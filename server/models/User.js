@@ -115,6 +115,20 @@ const userSchema = new mongoose.Schema(
       type: [walletTransactionSchema],
       default: [],
     },
+    upiId: {
+      type: String,
+      default: "",
+      trim: true,
+      lowercase: true,
+    },
+    razorpayContactId: {
+      type: String,
+      default: "",
+    },
+    razorpayFundAccountId: {
+      type: String,
+      default: "",
+    },
   },
   {
     timestamps: true,

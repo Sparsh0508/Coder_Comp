@@ -23,6 +23,7 @@ function WalletPage() {
   const [wallet, setWallet] = useState(null);
   const [depositRupees, setDepositRupees] = useState("10");
   const [withdrawCoinsValue, setWithdrawCoinsValue] = useState("100");
+  const [upiId, setUpiId] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -47,11 +48,19 @@ function WalletPage() {
   const withdrawPreview = useMemo(() => Number(((Number(withdrawCoinsValue || 0) / 100) * 10).toFixed(2)), [withdrawCoinsValue]);
   const canUseRazorpay = Boolean(wallet?.razorpayKeyId);
   const isManualMode = !canUseRazorpay;
+  const payoutsEnabled = Boolean(wallet?.payoutsEnabled);
 
   const refreshWallet = async () => {
     const response = await getWallet();
     setWallet(response.wallet);
   };
+
+  useEffect(() => {
+    if (!wallet?.upiId && !user?.upiId) {
+      return;
+    }
+    setUpiId(wallet?.upiId || user?.upiId || "");
+  }, [user?.upiId, wallet?.upiId]);
 
   const handleDeposit = async (event) => {
     event.preventDefault();
@@ -125,7 +134,19 @@ function WalletPage() {
       if (!canUseRazorpay) {
         throw new Error("Withdrawals require Razorpay configuration. Add keys in server/.env and restart the server.");
       }
-      const response = await withdrawCoins({ coinsAmount: Number(withdrawCoinsValue) });
+
+      if (!payoutsEnabled) {
+        throw new Error("Razorpay payouts are not enabled. Set RAZORPAYX_ACCOUNT_NUMBER in server/.env.");
+      }
+
+      if (!upiId.trim()) {
+        throw new Error("Please enter a valid UPI ID for payout.");
+      }
+
+      const response = await withdrawCoins({
+        coinsAmount: Number(withdrawCoinsValue),
+        upiId: upiId.trim(),
+      });
       setMessage(response.message);
       await refreshWallet();
     } catch (requestError) {
@@ -193,8 +214,23 @@ function WalletPage() {
           <div className="mt-4 rounded-2xl border border-white/10 bg-black/15 p-4 text-sm text-paper-200/70">
             Minimum withdrawal: <span className="font-semibold text-flame-400">100 coins</span>.
             <div className="mt-2">Estimated payout: <span className="font-semibold text-paper-100">Rs {withdrawPreview}</span></div>
+            <div className="mt-2 text-paper-200/55">
+              {payoutsEnabled
+                ? "Payouts are processed via Razorpay UPI."
+                : "Razorpay payouts are not enabled yet. Add RAZORPAYX_ACCOUNT_NUMBER to server/.env."}
+            </div>
           </div>
-          <button className="arena-button-secondary mt-6" type="submit" disabled={withdrawing || isManualMode}>
+          <div className="mt-4">
+            <label className="mb-2 block text-sm text-paper-200/60">UPI ID</label>
+            <input
+              className="arena-input"
+              type="text"
+              placeholder="name@bank"
+              value={upiId}
+              onChange={(event) => setUpiId(event.target.value)}
+            />
+          </div>
+          <button className="arena-button-secondary mt-6" type="submit" disabled={withdrawing || isManualMode || !payoutsEnabled}>
             {withdrawing ? "Submitting..." : "Request Withdrawal"}
           </button>
         </form>

@@ -1,7 +1,15 @@
 const bcrypt = require("bcrypt");
 
 const User = require("../models/User");
-const { createRazorpayOrder, ensureRazorpayConfigured, getRazorpayConfig, verifyRazorpaySignature } = require("../utils/razorpay");
+const {
+  createRazorpayContact,
+  createRazorpayFundAccount,
+  createRazorpayOrder,
+  createRazorpayPayout,
+  ensureRazorpayConfigured,
+  getRazorpayConfig,
+  verifyRazorpaySignature,
+} = require("../utils/razorpay");
 const { buildTokenPayload, signToken } = require("../utils/jwt");
 const { setAuthCookie, clearAuthCookie } = require("../utils/cookies");
 const { coinsToRupees, MIN_WITHDRAW_COINS, rupeesToCoins } = require("../utils/wallet");
@@ -21,6 +29,7 @@ function sanitizeUser(user) {
     coinBalance: user.coinBalance,
     activeMatchId: user.activeMatchId,
     activeMatchStatus: user.activeMatchStatus,
+    upiId: user.upiId,
   };
 }
 
@@ -173,6 +182,8 @@ async function getWallet(req, res) {
       coinBalance: req.user.coinBalance,
       paymentProvider: paymentConfig.keyId ? "razorpay" : "manual",
       razorpayKeyId: paymentConfig.keyId || null,
+      payoutsEnabled: Boolean(paymentConfig.payoutsAccountNumber),
+      upiId: req.user.upiId || "",
       conversion: {
         rupeesPer100Coins: 10,
         coinsPer10Rupees: 100,
@@ -330,9 +341,14 @@ async function depositCoins(req, res, next) {
 async function withdrawCoins(req, res, next) {
   try {
     const coinsAmount = Number(req.body.coinsAmount);
+    const upiId = String(req.body.upiId || "").trim().toLowerCase();
 
     if (!Number.isFinite(coinsAmount) || coinsAmount <= 0) {
       return res.status(400).json({ success: false, message: "Enter a valid coin amount" });
+    }
+
+    if (!upiId) {
+      return res.status(400).json({ success: false, message: "UPI ID is required for withdrawals" });
     }
 
     if (coinsAmount < MIN_WITHDRAW_COINS) {
@@ -347,19 +363,49 @@ async function withdrawCoins(req, res, next) {
     }
 
     const rupeesAmount = coinsToRupees(coinsAmount);
+    const referenceId = `wd_${req.user._id.toString().slice(-6)}_${Date.now().toString(36)}`;
+
+    if (!req.user.razorpayContactId || !req.user.razorpayFundAccountId || req.user.upiId !== upiId) {
+      const contact = await createRazorpayContact({
+        name: req.user.username,
+        email: req.user.email,
+        contact: "9999999999",
+        referenceId,
+        notes: { userId: req.user._id.toString() },
+      });
+
+      const fundAccount = await createRazorpayFundAccount({
+        contactId: contact.id,
+        upiId,
+      });
+
+      req.user.razorpayContactId = contact.id;
+      req.user.razorpayFundAccountId = fundAccount.id;
+      req.user.upiId = upiId;
+    }
+
+    const payout = await createRazorpayPayout({
+      fundAccountId: req.user.razorpayFundAccountId,
+      amountInRupees: rupeesAmount,
+      referenceId,
+      notes: { userId: req.user._id.toString(), coinsAmount: String(coinsAmount) },
+    });
+
     req.user.coinBalance -= coinsAmount;
     req.user.walletTransactions.unshift({
       type: "withdrawal",
       rupeesAmount,
       coinsAmount,
-      status: "pending",
-      note: `Withdrawal request for Rs ${rupeesAmount}`,
+      status: payout.status === "processed" ? "completed" : "pending",
+      note: `Razorpay payout ${payout.status || "processing"} for Rs ${rupeesAmount}`,
+      provider: "razorpay",
+      referenceId: payout.id,
     });
     await req.user.save();
 
     return res.status(200).json({
       success: true,
-      message: `Withdrawal request placed for Rs ${rupeesAmount}`,
+      message: `Withdrawal initiated for Rs ${rupeesAmount}. Status: ${payout.status || "processing"}.`,
       user: sanitizeUser(req.user),
       wallet: {
         coinBalance: req.user.coinBalance,
