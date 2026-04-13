@@ -46,6 +46,7 @@ function WalletPage() {
   const depositPreview = useMemo(() => Math.round((Number(depositRupees || 0) / 10) * 100), [depositRupees]);
   const withdrawPreview = useMemo(() => Number(((Number(withdrawCoinsValue || 0) / 100) * 10).toFixed(2)), [withdrawCoinsValue]);
   const canUseRazorpay = Boolean(wallet?.razorpayKeyId);
+  const isManualMode = !canUseRazorpay;
 
   const refreshWallet = async () => {
     const response = await getWallet();
@@ -60,10 +61,7 @@ function WalletPage() {
 
     try {
       if (!canUseRazorpay) {
-        const response = await depositCoins({ rupeesAmount: Number(depositRupees) });
-        setMessage(response.message);
-        await refreshWallet();
-        return;
+        throw new Error("Razorpay is not configured. Add keys in server/.env and restart the server.");
       }
 
       const checkoutLoaded = await loadRazorpayCheckout();
@@ -124,6 +122,9 @@ function WalletPage() {
     setError("");
 
     try {
+      if (!canUseRazorpay) {
+        throw new Error("Withdrawals require Razorpay configuration. Add keys in server/.env and restart the server.");
+      }
       const response = await withdrawCoins({ coinsAmount: Number(withdrawCoinsValue) });
       setMessage(response.message);
       await refreshWallet();
@@ -170,10 +171,12 @@ function WalletPage() {
             <IndianRupee size={16} className="mb-2 text-paper-200/50" />
             You will receive approximately <span className="font-semibold text-arena-400">{depositPreview} coins</span>.
             <div className="mt-2 text-paper-200/55">
-              {canUseRazorpay ? "Secure checkout via Razorpay with server-side verification." : "Using local deposit mode. Add Razorpay keys to enable live payments."}
+              {canUseRazorpay
+                ? "Secure checkout via Razorpay with server-side verification."
+                : "Razorpay keys are missing. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to enable payments."}
             </div>
           </div>
-          <button className="arena-button-primary mt-6" type="submit" disabled={depositing}>
+          <button className="arena-button-primary mt-6" type="submit" disabled={depositing || isManualMode}>
             {depositing ? "Depositing..." : "Add Coins"}
           </button>
         </form>
@@ -191,7 +194,7 @@ function WalletPage() {
             Minimum withdrawal: <span className="font-semibold text-flame-400">100 coins</span>.
             <div className="mt-2">Estimated payout: <span className="font-semibold text-paper-100">Rs {withdrawPreview}</span></div>
           </div>
-          <button className="arena-button-secondary mt-6" type="submit" disabled={withdrawing}>
+          <button className="arena-button-secondary mt-6" type="submit" disabled={withdrawing || isManualMode}>
             {withdrawing ? "Submitting..." : "Request Withdrawal"}
           </button>
         </form>

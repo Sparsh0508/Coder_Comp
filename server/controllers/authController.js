@@ -196,7 +196,8 @@ async function createDepositOrder(req, res, next) {
     }
 
     const coinsAmount = rupeesToCoins(rupeesAmount);
-    const receipt = `dep_${req.user._id}_${Date.now()}`;
+    const shortUser = req.user._id.toString().slice(-6);
+    const receipt = `dep_${shortUser}_${Date.now().toString(36)}`;
     const order = await createRazorpayOrder({
       amountInRupees: rupeesAmount,
       receipt,
