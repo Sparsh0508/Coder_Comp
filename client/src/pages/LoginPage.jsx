@@ -2,6 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 
 import AuthForm from "../components/AuthForm";
+import AuthLayout from "../components/AuthLayout";
 import { useAuth } from "../context/AuthContext";
 
 function LoginPage() {
@@ -38,7 +39,7 @@ function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
+    <AuthLayout>
       <AuthForm
         title="Welcome back"
         subtitle="Sign in to queue for live coding duels, chase rating, and climb the arena ladder."
@@ -55,13 +56,13 @@ function LoginPage() {
         footer={
           <>
             New to the arena?{" "}
-            <Link className="font-semibold text-arena-400" to="/signup">
+            <Link className="font-semibold text-arena-400 hover:text-arena-500 transition-colors" to="/signup">
               Create an account
             </Link>
           </>
         }
       />
-    </div>
+    </AuthLayout>
   );
 }
 

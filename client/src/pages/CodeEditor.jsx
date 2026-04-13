@@ -58,8 +58,6 @@ const { user } = useAuth();
     cpp: "cpp",
     java: "java"
   };
-
-  // 🔥 Highlight
   useEffect(() => {
     if (codeRef.current) {
       const lang = langMap[language] || "javascript";
@@ -67,8 +65,6 @@ const { user } = useAuth();
       codeRef.current.innerHTML = Prism.highlight(code, grammar, lang);
     }
   }, [code, language]);
-
-  // 🔥 Save code per language
   useEffect(() => {
     setSavedCodes((prev) => ({
       ...prev,
@@ -76,7 +72,6 @@ const { user } = useAuth();
     }));
   }, [code]);
 
-  // 🔥 Load code on language switch
   useEffect(() => {
     setCode(savedCodes[language] || boilerplates[language]);
   }, [language]);
@@ -91,14 +86,14 @@ const { user } = useAuth();
       alert("😢 You Lost!");
     }
 
-    navigate("/dashboard"); // or result page
+    navigate("/dashboard"); 
   });
 
   return () => {
     socket.off("match_result");
   };
 }, []);
-  // ✏️ Typing
+ 
   const handleChange = (e) => {
     const value = e.target.value;
     setCode(value);
@@ -108,7 +103,7 @@ const { user } = useAuth();
     setActiveLine(lines);
   };
 
-  // ⌨️ Tab + Run shortcut
+ 
   const handleKeyDown = (e) => {
     if (e.key === "Tab") {
       e.preventDefault();
@@ -131,7 +126,6 @@ const { user } = useAuth();
     }
   };
 
-  // 🔄 Scroll sync
   const handleScroll = (e) => {
     if (codeRef.current) {
       codeRef.current.scrollTop = e.target.scrollTop;
@@ -139,7 +133,7 @@ const { user } = useAuth();
     }
   };
 
-  // ▶ RUN
+ 
   const runCode = async () => {
     setLoadingRun(true);
     setOutput("⚡ Running...");
@@ -154,7 +148,7 @@ const { user } = useAuth();
         body: JSON.stringify({
           code,
           language,
-          inputs: testcases // 🔥 Send all cases!
+          inputs: testcases 
         })
       });
 
@@ -166,7 +160,6 @@ const { user } = useAuth();
         setActiveCase(0);
         setOutput(data.status === "Success" ? "⚡ Run Finished" : "❌ Error");
       } else {
-        // Fallback for single run if things go south
         setOutput(data.output || data.error || "No output");
       }
     } catch (err) {
@@ -176,8 +169,6 @@ const { user } = useAuth();
 
     setLoadingRun(false);
   };
-
-  // 🚀 SUBMIT
   const submitCode = async () => {
     setLoadingSubmit(true);
     setOutput("🚀 Submitting...");
@@ -201,7 +192,7 @@ const { user } = useAuth();
       setActiveCase(0);
 
       if (data.status === "Accepted") {
-        setOutput("✅ Accepted 🎉");
+        setOutput(" Accepted 🎉");
         socket.emit("submit_success", {
           matchId: id,
           userId: user?.id
@@ -220,7 +211,7 @@ const { user } = useAuth();
   return (
     <div className="bg-[#0f172a] text-white rounded-lg border border-gray-700 h-full flex flex-col">
 
-      {/* HEADER */}
+   
       <div className="flex justify-between items-center px-4 py-2 bg-[#020617] border-b border-gray-700">
 
         <select
@@ -253,10 +244,8 @@ const { user } = useAuth();
         </div>
       </div>
 
-      {/* EDITOR */}
       <div className="flex flex-[2] border-b border-gray-700">
 
-        {/* Line Numbers */}
         <div className="bg-[#020617] text-gray-500 text-sm px-2 py-2 select-none">
           {code.split("\n").map((_, i) => (
             <div key={i} className={activeLine === i + 1 ? "text-white" : ""}>
@@ -265,7 +254,6 @@ const { user } = useAuth();
           ))}
         </div>
 
-        {/* Code */}
         <div className="relative flex-1 overflow-auto">
           <pre
             ref={codeRef}
@@ -283,11 +271,8 @@ const { user } = useAuth();
           />
         </div>
       </div>
-
-      {/* TESTCASE PANEL */}
       <div className="flex flex-col flex-1 bg-[#0b1220]">
 
-        {/* Tabs */}
         <div className="flex gap-4 px-3 py-2 border-b border-gray-700 text-sm">
           <button
             onClick={() => setActiveTab("testcase")}
@@ -304,14 +289,12 @@ const { user } = useAuth();
           </button>
         </div>
 
-        {/* CONTENT */}
+       
         <div className="flex-1 p-3 overflow-auto">
 
-          {/* TESTCASE UI */}
           {activeTab === "testcase" && (
             <div className="flex flex-col gap-4">
 
-              {/* Case Tabs */}
               <div className="flex gap-2">
                 {testcases.map((_, i) => (
                   <button
@@ -341,7 +324,6 @@ const { user } = useAuth();
                 </button>
               </div>
 
-              {/* nums */}
               <div>
                 <label className="text-sm text-gray-400">nums =</label>
                 <input
@@ -355,7 +337,7 @@ const { user } = useAuth();
                 />
               </div>
 
-              {/* target */}
+             
               <div>
                 <label className="text-sm text-gray-400">target =</label>
                 <input
@@ -371,10 +353,10 @@ const { user } = useAuth();
             </div>
           )}
 
-          {/* RESULT */}
+       
           {activeTab === "result" && (
             <div className="flex flex-col gap-4 h-full">
-              {/* Result Summary */}
+             
               <div className={`p-3 rounded-lg border ${
                 testResults.every(r => r.verdict === 'Accepted') 
                 ? 'bg-green-500/10 border-green-500/30 text-green-400' 
@@ -386,7 +368,6 @@ const { user } = useAuth();
                 </h2>
               </div>
 
-              {/* Case Result Tabs */}
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {testResults.map((r, i) => (
                   <button
@@ -408,7 +389,6 @@ const { user } = useAuth();
                 ))}
               </div>
 
-              {/* Selected Case Detail */}
               {testResults[activeCase] && (
                 <div className="flex-1 bg-black/40 rounded-xl p-4 border border-white/5 overflow-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
                   <div className="space-y-4 font-mono text-sm">
@@ -452,7 +432,6 @@ const { user } = useAuth();
                 </div>
               )}
 
-              {/* Fallback for Run (no testResults array) */}
               {!testResults[activeCase] && output && (
                 <pre className="bg-black/40 p-4 rounded-xl text-sm h-full whitespace-pre-wrap border border-white/5 font-mono text-gray-300">
                   {output}

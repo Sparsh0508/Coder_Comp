@@ -127,31 +127,40 @@ function EditorPanel({
 
   return (
     <section
-      className={`arena-panel flex h-full flex-col overflow-hidden ${
+      className={`arena-panel flex h-full flex-col overflow-hidden relative shadow-[0_10px_50px_rgba(0,0,0,0.4)] ${
         isFullscreen ? "fixed inset-4 z-50 h-[calc(100vh-2rem)]" : ""
       }`}
     >
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-5 py-4">
+      <div className="absolute top-0 left-0 w-full h-1 bg-white/10">
+        <div 
+           className="h-full bg-gradient-to-r from-arena-500 to-arena-400 transition-all duration-1000"
+           style={{ 
+              width: timer && timer !== "--:--" ? `${Math.max(0, Math.min(100, (parseInt(timer.split(":")[0]) * 60 + parseInt(timer.split(":")[1])) / 1800 * 100))}%` : '100%',
+              backgroundColor: timer && parseInt(timer.split(":")[0]) < 10 ? (parseInt(timer.split(":")[0]) < 3 ? '#ff8a3d' : '#facc15') : ''
+           }} 
+        />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-5 py-4 bg-black/20">
         <div className="flex flex-wrap items-center gap-3">
-          <select className="arena-input min-w-36 py-2" value={language} onChange={(event) => onLanguageChange(event.target.value)}>
+          <select className="arena-input min-w-36 py-2 bg-black/40 border-white/5 font-mono text-sm" value={language} onChange={(event) => onLanguageChange(event.target.value)}>
             <option value="cpp">C++</option>
             <option value="java">Java</option>
             <option value="python">Python</option>
           </select>
-          <div className="rounded-full border border-white/10 bg-arena-900/75 px-3 py-2 font-mono text-sm text-paper-100">
+          <div className={`rounded-xl border border-white/10 bg-black/40 px-4 py-2 font-mono text-base font-bold shadow-inner ${timer && parseInt(timer.split(":")[0]) < 10 ? 'text-flame-400' : 'text-paper-100'}`}>
             {timer}
           </div>
-          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-arena-900/75 px-2 py-1">
+          <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/40 px-3 py-2 shadow-inner">
             <button
-              className="rounded-full px-2 py-1 text-xs text-paper-100 hover:bg-white/10"
+              className="rounded px-2 text-xs text-paper-100 hover:bg-white/10 transition-colors"
               onClick={() => setFontSize((value) => Math.max(12, value - 1))}
             >
               A-
             </button>
-            <div className="text-xs text-paper-200/60">Font {fontSize}</div>
+            <div className="text-xs font-mono font-bold text-paper-200/60 w-12 text-center">{fontSize}px</div>
             <button
-              className="rounded-full px-2 py-1 text-xs text-paper-100 hover:bg-white/10"
-              onClick={() => setFontSize((value) => Math.min(20, value + 1))}
+              className="rounded px-2 text-xs text-paper-100 hover:bg-white/10 transition-colors"
+              onClick={() => setFontSize((value) => Math.min(24, value + 1))}
             >
               A+
             </button>

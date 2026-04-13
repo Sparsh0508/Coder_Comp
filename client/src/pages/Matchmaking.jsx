@@ -6,11 +6,10 @@ const Matchmaking = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // 🔥 Join queue
     socket.emit("join_queue");
 
     const handleMatchFound = (data) => {
-      console.log("🔥 MATCH FOUND:", data);
+      console.log(" MATCH FOUND:", data);
 
       navigate(`/match/${data.matchId}`, {
         state: { players: data.players },

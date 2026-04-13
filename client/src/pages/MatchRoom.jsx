@@ -13,7 +13,6 @@ const MatchRoom = () => {
   const playersRef = useRef(players);
   const playersNamesRef = useRef(playersNames);
 
-  // Keep ref updated
   useEffect(() => {
     playersRef.current = players;
   }, [players]);

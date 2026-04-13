@@ -42,7 +42,7 @@ function AuthForm({
 
         {error ? <div className="rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div> : null}
 
-        <button className="arena-button-primary w-full" disabled={loading} type="submit">
+        <button className="arena-button-primary w-full shadow-[0_0_15px_rgba(61,217,184,0.15)] transition-all duration-300 hover:shadow-[0_0_30px_rgba(61,217,184,0.6)] hover:brightness-110 motion-safe:hover:animate-pulse" disabled={loading} type="submit">
           {loading ? "Please wait..." : submitLabel}
         </button>
       </form>

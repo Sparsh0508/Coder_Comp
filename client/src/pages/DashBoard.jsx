@@ -91,10 +91,8 @@ socket.on("match_found", (data) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0f172a] via-[#020617] to-black text-white p-6 space-y-6">
 
-      {/* TOP GRID */}
       <div className="grid grid-cols-3 gap-6">
 
-        {/* USER CARD */}
         <div className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-5">
           <h2 className="text-2xl font-bold">{user?.username}</h2>
           <p className="text-gray-400">{user?.rank}</p>
@@ -103,7 +101,6 @@ socket.on("match_found", (data) => {
           </p>
         </div>
 
-        {/* PLAY CARD */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 flex flex-col justify-center items-center shadow-lg shadow-blue-500/20">
           <h2 className="text-xl font-semibold mb-3">Ready to battle?</h2>
 
@@ -126,7 +123,7 @@ socket.on("match_found", (data) => {
             </>
           )}
 
-          {/* 🔴 MESSAGE */}
+       
           {message && (
             <p className="mt-3 text-red-400 text-sm text-center">
               {message}
@@ -134,7 +131,6 @@ socket.on("match_found", (data) => {
           )}
         </div>
 
-        {/* STATS */}
         <div className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-5 space-y-1">
           <p>Total Matches: <span className="text-blue-400">{stats?.total}</span></p>
           <p>Wins: <span className="text-green-400">{stats?.wins}</span></p>
@@ -143,10 +139,9 @@ socket.on("match_found", (data) => {
         </div>
       </div>
 
-      {/* BOTTOM GRID */}
+    
       <div className="grid grid-cols-2 gap-6">
 
-        {/* LEADERBOARD */}
         <div className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-5">
           <h2 className="text-lg font-bold mb-4 text-blue-400">Top Players</h2>
 
@@ -158,7 +153,6 @@ socket.on("match_found", (data) => {
           ))}
         </div>
 
-        {/* MATCHES */}
         <div className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-5">
           <h2 className="text-lg font-bold mb-4 text-purple-400">Recent Matches</h2>
 

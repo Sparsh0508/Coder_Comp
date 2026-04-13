@@ -157,120 +157,167 @@ function WalletPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <section className="arena-panel grid gap-6 p-8 lg:grid-cols-[1.1fr_0.9fr]">
+    <div className="space-y-6 max-w-6xl mx-auto">
+      <section className="arena-panel grid gap-6 p-8 lg:grid-cols-[1.2fr_0.8fr] items-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(234,179,8,0.1)_0%,transparent_70%)] pointer-events-none" />
+        
         <div>
-          <div className="text-xs uppercase tracking-[0.24em] text-paper-200/45">Wallet</div>
-          <h1 className="mt-3 text-3xl font-bold">Coin Wallet</h1>
-          <p className="mt-2 text-paper-200/65">Deposit rupees into coins, request withdrawals, and track your wallet activity.</p>
+          <div className="text-xs uppercase tracking-[0.24em] text-paper-200/45 font-bold mb-2">Wallet</div>
+          <h1 className="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-white to-paper-200/50">Coin Balance</h1>
+          <p className="mt-3 text-paper-200/65 max-w-sm">Deposit rupees into coins to participate in matches, request withdrawals, and track your wallet activity.</p>
         </div>
 
-        <div className="rounded-3xl border border-arena-500/20 bg-gradient-to-br from-arena-500/12 to-flame-500/10 p-6">
-          <div className="flex items-center gap-3 text-paper-100">
-            <Coins className="text-yellow-300" size={22} />
-            <span className="text-sm uppercase tracking-[0.22em] text-paper-200/55">Current Balance</span>
+        <div className="rounded-[2.5rem] border-2 border-yellow-500/30 bg-gradient-to-br from-yellow-500/10 to-transparent p-8 flex flex-col items-center justify-center relative shadow-[inset_0_0_50px_rgba(234,179,8,0.1)]">
+          <div className="relative mb-6">
+            <div className="absolute inset-0 bg-yellow-500 rounded-full blur-[30px] opacity-40 animate-pulse" />
+            <div className="relative w-24 h-24 rounded-full border-4 border-yellow-400 bg-gradient-to-br from-yellow-300 via-yellow-500 to-yellow-600 flex items-center justify-center shadow-[0_0_30px_rgba(234,179,8,0.5)] overflow-hidden">
+              <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.4)_50%,transparent_75%)] bg-[length:250%_250%] animate-[shimmer_3s_infinite_linear]" />
+              <Coins className="text-yellow-100 drop-shadow-md z-10" size={40} />
+            </div>
           </div>
-          <div className="mt-5 text-5xl font-black">{user?.coinBalance ?? wallet?.coinBalance ?? 0}</div>
-          <div className="mt-3 text-paper-200/65">Conversion: Rs 10 = 100 coins</div>
+          
+          <div className="text-6xl font-black text-white drop-shadow-[0_0_15px_rgba(234,179,8,0.4)]">
+            {user?.coinBalance ?? wallet?.coinBalance ?? 0}
+          </div>
+          <div className="mt-2 text-sm font-bold uppercase tracking-[0.22em] text-yellow-500">Total Coins</div>
         </div>
       </section>
 
-      {message ? <div className="rounded-2xl border border-arena-500/25 bg-arena-500/10 px-4 py-3 text-sm text-arena-400">{message}</div> : null}
-      {error ? <div className="rounded-2xl border border-red-400/25 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div> : null}
+      {message ? <div className="rounded-2xl border border-arena-500/25 bg-arena-500/10 px-4 py-3 text-sm text-arena-400 font-bold">{message}</div> : null}
+      {error ? <div className="rounded-2xl border border-red-400/25 bg-red-500/10 px-4 py-3 text-sm text-red-200 font-bold">{error}</div> : null}
 
       <section className="grid gap-6 lg:grid-cols-2">
-        <form className="arena-panel p-8" onSubmit={handleDeposit}>
-          <div className="flex items-center gap-3">
-            <ArrowDownLeft className="text-arena-400" size={20} />
-            <div className="text-lg font-semibold">Add Coins</div>
+        <form className="arena-panel p-8 relative overflow-hidden" onSubmit={handleDeposit}>
+          <div className="absolute top-0 right-0 p-8 opacity-5">
+             <ArrowDownLeft size={100} />
           </div>
-          <div className="mt-6">
-            <label className="mb-2 block text-sm text-paper-200/60">Amount in Rupees</label>
-            <input className="arena-input" type="number" min="1" step="1" value={depositRupees} onChange={(event) => setDepositRupees(event.target.value)} />
+          <div className="flex items-center gap-3 relative z-10">
+            <div className="w-10 h-10 rounded-full bg-arena-500/20 flex items-center justify-center text-arena-400">
+              <ArrowDownLeft size={20} />
+            </div>
+            <div className="text-xl font-bold">Add Coins</div>
           </div>
-          <div className="mt-4 rounded-2xl border border-white/10 bg-black/15 p-4 text-sm text-paper-200/70">
-            <IndianRupee size={16} className="mb-2 text-paper-200/50" />
-            You will receive approximately <span className="font-semibold text-arena-400">{depositPreview} coins</span>.
-            <div className="mt-2 text-paper-200/55">
+          <div className="mt-8 relative z-10">
+            <label className="mb-2 block text-sm font-semibold uppercase tracking-widest text-paper-200/60">Amount in Rupees</label>
+            <input className="arena-input text-lg font-mono" type="number" min="1" step="1" value={depositRupees} onChange={(event) => setDepositRupees(event.target.value)} />
+          </div>
+          <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-5 text-sm text-paper-200/70 relative z-10 box-shadow-inner">
+            <div className="flex items-center gap-2 mb-2 font-bold text-white">
+              <IndianRupee size={16} className="text-paper-200/50" /> Estimated Value
+            </div>
+            You will receive <span className="font-bold text-arena-400 tracking-wider">+{depositPreview} coins</span>.
+            <div className="mt-3 pt-3 border-t border-white/5 text-[10px] uppercase tracking-widest text-paper-200/40 font-bold">
               {canUseRazorpay
                 ? "Secure checkout via Razorpay with server-side verification."
-                : "Razorpay keys are missing. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to enable payments."}
+                : "Razorpay keys are missing. Configure .env."}
             </div>
           </div>
-          <button className="arena-button-primary mt-6" type="submit" disabled={depositing || isManualMode}>
-            {depositing ? "Depositing..." : "Add Coins"}
+          <button className="arena-button-primary mt-8 w-full text-lg shadow-[0_0_20px_rgba(61,217,184,0.2)] hover:shadow-[0_0_30px_rgba(61,217,184,0.4)] relative z-10" type="submit" disabled={depositing || isManualMode}>
+            {depositing ? "Depositing..." : "Continue to Payment"}
           </button>
         </form>
 
-        <form className="arena-panel p-8" onSubmit={handleWithdraw}>
-          <div className="flex items-center gap-3">
-            <ArrowUpRight className="text-flame-400" size={20} />
-            <div className="text-lg font-semibold">Withdraw Coins</div>
+        <form className="arena-panel p-8 relative overflow-hidden" onSubmit={handleWithdraw}>
+          <div className="absolute top-0 right-0 p-8 opacity-5">
+             <ArrowUpRight size={100} />
           </div>
-          <div className="mt-6">
-            <label className="mb-2 block text-sm text-paper-200/60">Coins to Withdraw</label>
-            <input className="arena-input" type="number" min="100" step="100" value={withdrawCoinsValue} onChange={(event) => setWithdrawCoinsValue(event.target.value)} />
-          </div>
-          <div className="mt-4 rounded-2xl border border-white/10 bg-black/15 p-4 text-sm text-paper-200/70">
-            Minimum withdrawal: <span className="font-semibold text-flame-400">100 coins</span>.
-            <div className="mt-2">Estimated payout: <span className="font-semibold text-paper-100">Rs {withdrawPreview}</span></div>
-            <div className="mt-2 text-paper-200/55">
-              {payoutsEnabled
-                ? "Payouts are processed via Razorpay UPI."
-                : "Razorpay payouts are not enabled yet. Add RAZORPAYX_ACCOUNT_NUMBER to server/.env."}
+          <div className="flex items-center gap-3 relative z-10">
+            <div className="w-10 h-10 rounded-full bg-flame-500/20 flex items-center justify-center text-flame-400">
+              <ArrowUpRight size={20} />
             </div>
+            <div className="text-xl font-bold">Withdraw Coins</div>
           </div>
-          <div className="mt-4">
-            <label className="mb-2 block text-sm text-paper-200/60">UPI ID</label>
+          <div className="mt-8 relative z-10">
+            <label className="mb-2 block text-sm font-semibold uppercase tracking-widest text-paper-200/60">Coins to Withdraw</label>
+            <input className="arena-input text-lg font-mono" type="number" min="100" step="100" value={withdrawCoinsValue} onChange={(event) => setWithdrawCoinsValue(event.target.value)} />
+          </div>
+          <div className="mt-4 relative z-10">
+            <label className="mb-2 block text-sm font-semibold uppercase tracking-widest text-paper-200/60">UPI ID</label>
             <input
-              className="arena-input"
+              className="arena-input font-mono"
               type="text"
               placeholder="name@bank"
               value={upiId}
               onChange={(event) => setUpiId(event.target.value)}
             />
           </div>
-          <button className="arena-button-secondary mt-6" type="submit" disabled={withdrawing || isManualMode || !payoutsEnabled}>
-            {withdrawing ? "Submitting..." : "Request Withdrawal"}
+          <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-5 text-sm text-paper-200/70 relative z-10">
+            Minimum withdrawal: <span className="font-bold text-flame-400">100 coins</span>.
+            <div className="mt-2 font-bold text-white flex items-center gap-2">Payout: <span className="text-paper-100 font-mono tracking-wider">Rs {withdrawPreview}</span></div>
+            <div className="mt-3 pt-3 border-t border-white/5 text-[10px] uppercase tracking-widest text-paper-200/40 font-bold">
+              {payoutsEnabled
+                ? "Payouts are processed via Razorpay UPI."
+                : "Razorpay payouts are not configured."}
+            </div>
+          </div>
+          <button className="arena-button bg-flame-500 hover:bg-flame-400 text-arena-950 font-bold mt-8 w-full text-lg shadow-[0_0_20px_rgba(255,138,61,0.2)] hover:shadow-[0_0_30px_rgba(255,138,61,0.4)] relative z-10" type="submit" disabled={withdrawing || isManualMode || !payoutsEnabled}>
+            {withdrawing ? "Submitting..." : "Request Payout"}
           </button>
         </form>
       </section>
 
       <section className="arena-panel overflow-hidden">
-        <div className="border-b border-white/10 px-6 py-5">
-          <div className="text-xs uppercase tracking-[0.24em] text-paper-200/45">Transactions</div>
-          <h2 className="mt-2 text-2xl font-bold">Wallet History</h2>
+        <div className="border-b border-white/10 px-8 py-6 flex items-center gap-3">
+          <div className="w-2 h-6 bg-yellow-500 rounded-full" />
+          <h2 className="text-2xl font-bold">Transaction History</h2>
         </div>
 
         {loading ? (
-          <div className="p-6 text-paper-200/60">Loading transactions...</div>
+          <div className="p-8 text-paper-200/60 font-mono animate-pulse">Loading data...</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-left">
-              <thead className="bg-white/5 text-xs uppercase tracking-[0.2em] text-paper-200/45">
+              <thead className="bg-black/30 text-[10px] font-bold uppercase tracking-[0.2em] text-paper-200/50 border-b border-white/5">
                 <tr>
-                  <th className="px-6 py-4">Type</th>
-                  <th className="px-6 py-4">Coins</th>
-                  <th className="px-6 py-4">Rupees</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">Note</th>
-                  <th className="px-6 py-4">Date</th>
+                  <th className="px-8 py-4">Status & Type</th>
+                  <th className="px-8 py-4">Amount</th>
+                  <th className="px-8 py-4">Equivalent</th>
+                  <th className="px-8 py-4">Details</th>
+                  <th className="px-8 py-4 text-right">Date</th>
                 </tr>
               </thead>
-              <tbody>
-                {(wallet?.transactions || []).map((transaction) => (
-                  <tr key={transaction.id} className="border-t border-white/5">
-                    <td className="px-6 py-4 capitalize">{transaction.type.replace("_", " ")}</td>
-                    <td className="px-6 py-4">{transaction.coinsAmount}</td>
-                    <td className="px-6 py-4">Rs {transaction.rupeesAmount ?? 0}</td>
-                    <td className="px-6 py-4 capitalize">{transaction.status}</td>
-                    <td className="px-6 py-4 text-paper-200/65">{transaction.note || "-"}</td>
-                    <td className="px-6 py-4">{new Date(transaction.createdAt).toLocaleString()}</td>
-                  </tr>
-                ))}
+              <tbody className="divide-y divide-white/5">
+                {(wallet?.transactions || []).map((transaction) => {
+                  const isIncoming = transaction.type === "deposit" || transaction.type === "match_reward";
+                  const isOutgoing = transaction.type === "withdrawal" || transaction.type === "match_entry";
+                  const StatusIcon = isIncoming ? ArrowDownLeft : isOutgoing ? ArrowUpRight : Coins;
+                  const statusColor = isIncoming ? "text-arena-400" : isOutgoing ? "text-flame-400" : "text-yellow-400";
+                  
+                  return (
+                    <tr key={transaction.id} className="hover:bg-white/5 transition-colors group">
+                      <td className="px-8 py-5">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-full bg-white/5 flex items-center justify-center ${statusColor}`}>
+                            <StatusIcon size={16} />
+                          </div>
+                          <div>
+                            <div className="font-bold text-white capitalize">{transaction.type.replace("_", " ")}</div>
+                            <div className="text-[10px] uppercase tracking-widest text-paper-200/50 capitalize">{transaction.status}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-8 py-5">
+                        <div className={`font-mono text-lg font-bold ${statusColor}`}>
+                          {isIncoming ? '+' : isOutgoing ? '-' : ''}{transaction.coinsAmount}
+                        </div>
+                      </td>
+                      <td className="px-8 py-5 font-mono text-paper-200/70 text-sm">
+                        Rs {transaction.rupeesAmount ?? 0}
+                      </td>
+                      <td className="px-8 py-5 text-paper-200/50 text-sm max-w-[200px] truncate">
+                        {transaction.note || "-"}
+                      </td>
+                      <td className="px-8 py-5 text-right font-mono text-[10px] uppercase tracking-widest text-paper-200/40">
+                        {new Date(transaction.createdAt).toLocaleString(undefined, {
+                          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                        })}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
-            {!wallet?.transactions?.length ? <div className="p-6 text-paper-200/60">No wallet activity yet.</div> : null}
+            {!wallet?.transactions?.length ? <div className="p-16 text-center text-paper-200/40 uppercase tracking-widest text-sm font-bold">No transactions found</div> : null}
           </div>
         )}
       </section>

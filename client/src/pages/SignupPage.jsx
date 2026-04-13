@@ -2,6 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 
 import AuthForm from "../components/AuthForm";
+import AuthLayout from "../components/AuthLayout";
 import { useAuth } from "../context/AuthContext";
 
 function SignupPage() {
@@ -31,7 +32,7 @@ function SignupPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
+    <AuthLayout>
       <AuthForm
         title="Create your arena identity"
         subtitle="Register once, then jump straight into head-to-head coding battles."
@@ -49,13 +50,13 @@ function SignupPage() {
         footer={
           <>
             Already registered?{" "}
-            <Link className="font-semibold text-arena-400" to="/login">
+            <Link className="font-semibold text-arena-400 hover:text-arena-500 transition-colors" to="/login">
               Log in here
             </Link>
           </>
         }
       />
-    </div>
+    </AuthLayout>
   );
 }
 

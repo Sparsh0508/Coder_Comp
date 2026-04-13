@@ -199,6 +199,7 @@ function MatchmakingPage() {
         onFindMatch={handleFindMatch}
         onCancel={handleCancel}
         activeMatch={activeMatch || (user?.activeMatchId ? { matchId: user.activeMatchId, status: user.activeMatchStatus } : null)}
+        user={user}
       />
       <div className="arena-panel p-8">
         <div className="mb-4 text-xs uppercase tracking-[0.25em] text-paper-200/45">How it works</div>

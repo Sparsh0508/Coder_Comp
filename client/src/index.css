@@ -24,10 +24,30 @@
 
   body {
     @apply min-h-screen bg-arena-950 font-sans text-paper-100 antialiased;
+    background-color: #07111d;
     background-image:
-      radial-gradient(circle at top left, rgba(61, 217, 184, 0.18), transparent 28%),
-      radial-gradient(circle at top right, rgba(255, 138, 61, 0.16), transparent 34%),
-      linear-gradient(180deg, #08111d 0%, #060b14 100%);
+      radial-gradient(circle at top left, rgba(61, 217, 184, 0.2), transparent 35%),
+      radial-gradient(circle at top right, rgba(255, 138, 61, 0.2), transparent 40%),
+      linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+    background-position: center top;
+    background-attachment: fixed;
+  }
+
+  /* Custom scrollbars for a premium feel */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-white/10 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-white/20;
   }
 
   #root {
