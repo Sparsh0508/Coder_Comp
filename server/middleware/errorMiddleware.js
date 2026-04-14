@@ -1,3 +1,5 @@
+const { logError } = require("../utils/logger");
+
 function notFoundHandler(req, res) {
   res.status(404).json({
     success: false,
@@ -6,7 +8,10 @@ function notFoundHandler(req, res) {
 }
 
 function errorHandler(error, _req, res, _next) {
-  console.error(error);
+  logError("ERROR", error.message || "Unhandled error", {
+    stack: error.stack,
+    statusCode: error.statusCode || 500,
+  });
   res.status(error.statusCode || 500).json({
     success: false,
     message: error.message || "Internal server error",

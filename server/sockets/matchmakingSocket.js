@@ -1,6 +1,7 @@
 const Match = require("../models/Match");
 const Problem = require("../models/Problem");
 const { awardPrizePool, deductEntryCoins, refundEntryCoins } = require("../utils/matchEconomy");
+const { logMatch, logWarn } = require("../utils/logger");
 const { clearUsersActiveMatch, setUsersActiveMatch } = require("../utils/userMatchState");
 const {
   LOBBY_DURATION_MS,
@@ -133,6 +134,8 @@ function scheduleLobbyStart(io, matchId) {
         "active"
       );
 
+      logMatch("Match started", { matchId: match._id.toString(), mode: match.mode });
+
       io.to(match.roomId).emit("matchStarted", {
         matchId: match._id.toString(),
         roomId: match.roomId,
@@ -254,6 +257,12 @@ async function createMatch(io, queuedPlayers, mode) {
         opponents: buildTeamPayload(opponents),
       });
     }
+  });
+
+  logMatch("Match created", {
+    matchId: hydratedMatch._id.toString(),
+    mode: hydratedMatch.mode,
+    teamSize: hydratedMatch.teamSize,
   });
 
   scheduleLobbyStart(io, hydratedMatch._id.toString());
@@ -432,6 +441,8 @@ function registerMatchmakingHandlers(io) {
         await match.save();
         await clearUsersActiveMatch(match.players.map((player) => player.user._id.toString()));
 
+        logWarn("MATCH", "Match cancelled (lobby disconnect)", { matchId: match._id.toString() });
+
         io.to(match.roomId).emit("matchCancelled", {
           matchId: match._id.toString(),
           reason: "A player left before the lobby countdown finished. Coins were refunded.",
@@ -461,6 +472,11 @@ function registerMatchmakingHandlers(io) {
       const rewardSummary = await awardPrizePool(match, winningTeam);
       await match.save();
       await clearUsersActiveMatch(match.players.map((player) => player.user._id.toString()));
+
+      logMatch("Match completed (disconnect)", {
+        matchId: match._id.toString(),
+        winnerTeam: winningTeam,
+      });
 
       io.to(match.roomId).emit("matchEnd", buildMatchEndPayload(match, winningTeam, "Opponent disconnected", rewardSummary));
     });

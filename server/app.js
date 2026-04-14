@@ -2,7 +2,6 @@ const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
-const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 
 const authRoutes = require("./routes/authRoutes");
@@ -10,6 +9,7 @@ const matchRoutes = require("./routes/matchRoutes");
 const problemRoutes = require("./routes/problemRoutes");
 const submissionRoutes = require("./routes/submissionRoutes");
 const leaderboardRoutes = require("./routes/leaderboardRoutes");
+const requestLogger = require("./middleware/requestLogger");
 const { errorHandler, notFoundHandler } = require("./middleware/errorMiddleware");
 
 const app = express();
@@ -48,7 +48,7 @@ if (isProduction) {
     })
   );
 }
-app.use(morgan("dev"));
+app.use(requestLogger);
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 

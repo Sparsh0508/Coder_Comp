@@ -2,6 +2,7 @@ const bcrypt = require("bcrypt");
 
 const User = require("../models/User");
 const { forfeitMatchByUser } = require("../utils/matchForfeit");
+const { logAuth, logPayment, logWarn } = require("../utils/logger");
 const {
   createRazorpayContact,
   createRazorpayFundAccount,
@@ -75,6 +76,7 @@ async function register(req, res, next) {
 
     const token = signToken(buildTokenPayload(user));
     setAuthCookie(res, token);
+    logAuth("User registered", { userId: user._id.toString() });
 
     return res.status(201).json({
       success: true,
@@ -97,12 +99,14 @@ async function login(req, res, next) {
     const user = await User.findOne({ email: email.toLowerCase() });
 
     if (!user) {
+      logWarn("AUTH", "Login failed: user not found", { email });
       return res.status(401).json({ success: false, message: "Invalid credentials" });
     }
 
     const isValidPassword = await bcrypt.compare(password, user.passwordHash);
 
     if (!isValidPassword) {
+      logWarn("AUTH", "Login failed: invalid password", { userId: user._id.toString() });
       return res.status(401).json({ success: false, message: "Invalid credentials" });
     }
 
@@ -132,6 +136,7 @@ async function login(req, res, next) {
 
     const token = signToken(buildTokenPayload(user));
     setAuthCookie(res, token);
+    logAuth("User logged in", { userId: user._id.toString() });
 
     return res.status(200).json({
       success: true,
@@ -182,6 +187,7 @@ async function updateProfile(req, res, next) {
     req.user.avatarUrl = avatarUrl.trim();
     req.user.bio = bio.trim();
     await req.user.save();
+    logAuth("Profile updated", { userId: req.user._id.toString() });
 
     return res.status(200).json({
       success: true,
@@ -248,6 +254,12 @@ async function createDepositOrder(req, res, next) {
       referenceId: order.id,
     });
     await req.user.save();
+    logPayment("Razorpay deposit order created", {
+      userId: req.user._id.toString(),
+      orderId: order.id,
+      coinsAmount,
+      rupeesAmount,
+    });
 
     return res.status(200).json({
       success: true,
@@ -305,6 +317,12 @@ async function verifyDepositOrder(req, res, next) {
     transaction.note = `Verified Razorpay payment for ${transaction.coinsAmount} coins`;
     req.user.coinBalance += transaction.coinsAmount;
     await req.user.save();
+    logPayment("Razorpay deposit verified", {
+      userId: req.user._id.toString(),
+      orderId: razorpayOrderId,
+      paymentId: razorpayPaymentId,
+      coinsAmount: transaction.coinsAmount,
+    });
 
     return res.status(200).json({
       success: true,
@@ -343,6 +361,11 @@ async function depositCoins(req, res, next) {
       note: `Added ${coinsAmount} coins from Rs ${rupeesAmount}`,
     });
     await req.user.save();
+    logPayment("Manual deposit completed", {
+      userId: req.user._id.toString(),
+      rupeesAmount,
+      coinsAmount,
+    });
 
     return res.status(200).json({
       success: true,
@@ -422,6 +445,13 @@ async function withdrawCoins(req, res, next) {
       referenceId: payout.id,
     });
     await req.user.save();
+    logPayment("Razorpay payout initiated", {
+      userId: req.user._id.toString(),
+      payoutId: payout.id,
+      rupeesAmount,
+      coinsAmount,
+      status: payout.status,
+    });
 
     return res.status(200).json({
       success: true,
@@ -440,6 +470,7 @@ async function withdrawCoins(req, res, next) {
 async function getSocketToken(req, res, next) {
   try {
     const token = signToken(buildTokenPayload(req.user), { expiresIn: "10m" });
+    logAuth("Socket token issued", { userId: req.user._id.toString() });
     return res.status(200).json({ success: true, token });
   } catch (error) {
     return next(error);
@@ -451,10 +482,12 @@ async function logout(req, res, next) {
     if (req.user && STRICT_SINGLE_SESSION) {
       req.user.sessionVersion += 1;
       await req.user.save();
+      logAuth("User logged out (session invalidated)", { userId: req.user._id.toString() });
     }
 
-  clearAuthCookie(res);
-  return res.status(200).json({ success: true, message: "Logged out successfully" });
+    clearAuthCookie(res);
+    logAuth("User logged out", { userId: req.user?._id?.toString() });
+    return res.status(200).json({ success: true, message: "Logged out successfully" });
   } catch (error) {
     return next(error);
   }

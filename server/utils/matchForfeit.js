@@ -1,5 +1,6 @@
 const Match = require("../models/Match");
 const { awardPrizePool } = require("./matchEconomy");
+const { logMatch } = require("./logger");
 const { clearUsersActiveMatch } = require("./userMatchState");
 
 function getOtherTeam(team) {
@@ -66,6 +67,12 @@ async function forfeitMatchByUser({ io, matchId, userId, reason }) {
   if (io) {
     io.to(match.roomId).emit("matchEnd", buildMatchEndPayload(match, winningTeam, reason, rewardSummary));
   }
+
+  logMatch("Match completed (forfeit)", {
+    matchId: match._id.toString(),
+    winnerTeam: winningTeam,
+    reason,
+  });
 
   return { match, rewardSummary };
 }
