@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import QueueStatusCard from "../components/QueueStatusCard";
 import { useAuth } from "../context/AuthContext";
 import { getSocketToken } from "../services/authService";
-import { getSocket } from "../services/socket";
+import { disconnectSocket, getSocket } from "../services/socket";
 import { findMatch, getActiveMatch, leaveQueue } from "../services/matchService";
 
 const entryCoinsByMode = {
@@ -117,30 +117,64 @@ function MatchmakingPage() {
       return;
     }
 
-    const socket = getSocket();
+    async function ensureConnected() {
+      let socket = getSocket();
 
-    if (!socket.connected) {
-      if (!socket.auth?.token) {
-        try {
+      if (socket.connected) {
+        return socket;
+      }
+
+      try {
+        const response = await getSocketToken();
+        socket.auth = { token: response.token };
+        socket.io.opts.query = { token: response.token };
+      } catch (error) {
+        throw new Error(error.message || "Unable to authenticate realtime connection");
+      }
+
+      socket.connect();
+
+      try {
+        await new Promise((resolve, reject) => {
+          const timeoutId = window.setTimeout(() => reject(new Error("Unable to establish realtime connection")), 5000);
+          socket.once("connect", () => {
+            window.clearTimeout(timeoutId);
+            resolve();
+          });
+          socket.once("connect_error", (error) => {
+            window.clearTimeout(timeoutId);
+            reject(new Error(error?.message || "Realtime connection failed"));
+          });
+        });
+        return socket;
+      } catch (error) {
+        if (String(error?.message || "").toLowerCase().includes("authentication")) {
+          // Token may have expired mid-match; create a fresh socket and retry once.
+          disconnectSocket();
+          socket = getSocket();
           const response = await getSocketToken();
           socket.auth = { token: response.token };
-        } catch (error) {
-          throw new Error(error.message || "Unable to authenticate realtime connection");
+          socket.io.opts.query = { token: response.token };
+          socket.connect();
+          await new Promise((resolve, reject) => {
+            const timeoutId = window.setTimeout(() => reject(new Error("Unable to establish realtime connection")), 5000);
+            socket.once("connect", () => {
+              window.clearTimeout(timeoutId);
+              resolve();
+            });
+            socket.once("connect_error", (connectError) => {
+              window.clearTimeout(timeoutId);
+              reject(new Error(connectError?.message || "Realtime connection failed"));
+            });
+          });
+          return socket;
         }
+
+        throw error;
       }
-      socket.connect();
-      await new Promise((resolve, reject) => {
-        const timeoutId = window.setTimeout(() => reject(new Error("Unable to establish realtime connection")), 5000);
-        socket.once("connect", () => {
-          window.clearTimeout(timeoutId);
-          resolve();
-        });
-        socket.once("connect_error", (error) => {
-          window.clearTimeout(timeoutId);
-          reject(new Error(error?.message || "Realtime connection failed"));
-        });
-      });
     }
+
+    const socket = await ensureConnected();
 
     setQueueState((current) => ({
       ...current,

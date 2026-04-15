@@ -11,15 +11,16 @@ function useMatchSocket({ roomId, onLobbyUpdated, onMatchStarted, onMatchCancell
     const socket = getSocket();
 
     async function connectSocket() {
-      if (!socket.connected) {
-        if (!socket.auth?.token) {
-          try {
-            const response = await getSocketToken();
-            socket.auth = { token: response.token };
-          } catch {
-          }
-        }
+      if (socket.connected) {
+        return;
+      }
+
+      try {
+        const response = await getSocketToken();
+        socket.auth = { token: response.token };
+        socket.io.opts.query = { token: response.token };
         socket.connect();
+      } catch {
       }
     }
 

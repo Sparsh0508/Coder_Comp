@@ -27,7 +27,7 @@ async function authenticateSocket(socket, next) {
     }
 
     const payload = verifyToken(token);
-    const user = await User.findById(payload.userId).select("username email rating");
+    const user = await User.findById(payload.userId).select("username email rating sessionVersion");
 
     if (!user) {
       return next(new Error("Socket authentication failed"));

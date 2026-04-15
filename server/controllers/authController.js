@@ -469,7 +469,7 @@ async function withdrawCoins(req, res, next) {
 
 async function getSocketToken(req, res, next) {
   try {
-    const token = signToken(buildTokenPayload(req.user), { expiresIn: "10m" });
+    const token = signToken(buildTokenPayload(req.user), { expiresIn: "7d" });
     logAuth("Socket token issued", { userId: req.user._id.toString() });
     return res.status(200).json({ success: true, token });
   } catch (error) {
