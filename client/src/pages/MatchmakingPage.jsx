@@ -28,10 +28,22 @@ function MatchmakingPage() {
   });
 
   useEffect(() => {
+    if (!user?.id) {
+      setActiveMatch(null);
+      return;
+    }
+
     getActiveMatch()
       .then((response) => setActiveMatch(response.activeMatch))
       .catch(() => setActiveMatch(null));
-  }, []);
+  }, [user?.id]);
+
+  useEffect(() => {
+    // Prevent stale "Resume match" UI after match cleanup updates the user state.
+    if (!user?.activeMatchId) {
+      setActiveMatch(null);
+    }
+  }, [user?.activeMatchId]);
 
   useEffect(() => {
     const socket = getSocket();

@@ -2,6 +2,23 @@ const Match = require("../models/Match");
 const Problem = require("../models/Problem");
 const { enqueuePlayer, getQueueSummary, removeQueuedPlayer, getSupportedModes } = require("../sockets/matchmakingSocket");
 const { getEntryCoins } = require("../utils/matchConfig");
+const { refundEntryCoins } = require("../utils/matchEconomy");
+const { forfeitMatchByUser } = require("../utils/matchForfeit");
+const { clearUsersActiveMatch } = require("../utils/userMatchState");
+
+function buildMatchEndSummary(match, reason) {
+  return {
+    matchId: match._id.toString(),
+    winnerId: match.winner ? match.winner.toString() : null,
+    winnerTeam: match.winnerTeam,
+    endedAt: match.endedAt,
+    status: match.status,
+    prizePool: match.prizePool,
+    rewardedUserIds: [],
+    perWinnerReward: 0,
+    reason,
+  };
+}
 
 function formatPlayer(player) {
   return {
@@ -158,9 +175,101 @@ async function getMatch(req, res, next) {
   }
 }
 
+async function timeoutMatch(req, res, next) {
+  try {
+    const match = await Match.findById(req.params.matchId)
+      .populate("problem")
+      .populate("players.user", "username rating coinBalance")
+      .populate("winner", "username rating coinBalance");
+
+    if (!match) {
+      return res.status(404).json({ success: false, message: "Match not found" });
+    }
+
+    const isParticipant = match.players.some((player) => player.user._id.toString() === req.user._id.toString());
+
+    if (!isParticipant) {
+      return res.status(403).json({ success: false, message: "You are not a participant in this match" });
+    }
+
+    if (["completed", "cancelled"].includes(match.status)) {
+      return res.status(200).json({
+        success: true,
+        match: formatMatch(match, req.user._id.toString()),
+        result: buildMatchEndSummary(match, "Match already ended"),
+      });
+    }
+
+    const now = Date.now();
+    const countdownEndsAt = match.countdownEndsAt ? new Date(match.countdownEndsAt).getTime() : 0;
+
+    if (countdownEndsAt && now < countdownEndsAt) {
+      return res.status(400).json({ success: false, message: "Match timer has not expired yet" });
+    }
+
+    match.status = "completed";
+    match.winner = null;
+    match.winnerTeam = null;
+    match.endedAt = new Date();
+
+    match.players.forEach((player) => {
+      if (player.status !== "disconnected") {
+        player.status = "defeated";
+      }
+      player.isTyping = false;
+    });
+
+    await refundEntryCoins(match);
+    await match.save();
+    await clearUsersActiveMatch(match.players.map((player) => player.user._id.toString()));
+
+    const io = req.app.get("io");
+    if (io) {
+      io.to(match.roomId).emit("matchEnd", buildMatchEndSummary(match, "Time expired"));
+    }
+
+    return res.status(200).json({
+      success: true,
+      match: formatMatch(match, req.user._id.toString()),
+      result: buildMatchEndSummary(match, "Time expired"),
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function forfeitMatch(req, res, next) {
+  try {
+    const matchId = req.params.matchId;
+    const io = req.app.get("io");
+    const userId = req.user._id.toString();
+
+    const outcome = await forfeitMatchByUser({
+      io,
+      matchId,
+      userId,
+      reason: "Player left the match",
+    });
+
+    if (!outcome?.match) {
+      return res.status(404).json({ success: false, message: "Match not found or already ended" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      match: formatMatch(outcome.match, userId),
+      result: buildMatchEndSummary(outcome.match, "Player left the match"),
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   findMatch,
   leaveQueue,
   getMatch,
   getActiveMatch,
+  timeoutMatch,
+  forfeitMatch,
 };

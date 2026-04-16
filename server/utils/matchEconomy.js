@@ -13,19 +13,31 @@ async function deductEntryCoins(userIds, entryCoins) {
     };
   }
 
-  await Promise.all(
-    users.map((user) => {
-      user.coinBalance -= entryCoins;
-      user.walletTransactions.unshift({
-        type: "match_entry",
-        rupeesAmount: 0,
-        coinsAmount: entryCoins,
-        status: "completed",
-        note: `Arena entry locked ${entryCoins} coins`,
-      });
-      return user.save();
-    })
+
+  await User.updateMany(
+    { _id: { $in: userIds } },
+    {
+      $inc: { coinBalance: -entryCoins },
+      $push: {
+        walletTransactions: {
+          $each: [
+            {
+              type: "match_entry",
+              rupeesAmount: 0,
+              coinsAmount: entryCoins,
+              status: "completed",
+              note: `Arena entry locked ${entryCoins} coins`,
+            },
+          ],
+          $position: 0,
+        },
+      },
+    }
   );
+
+  users.forEach((user) => {
+    user.coinBalance -= entryCoins;
+  });
 
   return {
     success: true,
@@ -97,16 +109,32 @@ async function refundEntryCoins(match) {
   const refundMap = new Map(refunds.map((refund) => [refund.userId, refund.amount]));
 
   await Promise.all(
-    users.map((user) => {
-      user.coinBalance += refundMap.get(user._id.toString()) || 0;
-      user.walletTransactions.unshift({
-        type: "refund",
-        rupeesAmount: 0,
-        coinsAmount: refundMap.get(user._id.toString()) || 0,
-        status: "completed",
-        note: "Lobby cancelled refund",
-      });
-      return user.save();
+    users.map(async (user) => {
+      const amount = refundMap.get(user._id.toString()) || 0;
+      if (!amount) {
+        return;
+      }
+
+      await User.updateOne(
+        { _id: user._id },
+        {
+          $inc: { coinBalance: amount },
+          $push: {
+            walletTransactions: {
+              $each: [
+                {
+                  type: "refund",
+                  rupeesAmount: 0,
+                  coinsAmount: amount,
+                  status: "completed",
+                  note: "Match entry refund",
+                },
+              ],
+              $position: 0,
+            },
+          },
+        }
+      );
     })
   );
 

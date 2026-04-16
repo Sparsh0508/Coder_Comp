@@ -5,14 +5,30 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getMatchById } from "../services/matchService";
 
-function ResultPlayerCard({ title, players, isWinner }) {
+function ResultPlayerCard({ title, players, isWinner, isDraw = false }) {
   return (
     <section
-      className={`arena-panel p-6 overflow-hidden relative ${isWinner ? "border-arena-500/40 bg-arena-500/5 shadow-[0_0_50px_rgba(61,217,184,0.1)]" : "border-flame-500/20 bg-flame-500/5"}`}
+      className={`arena-panel p-6 overflow-hidden relative ${
+        isDraw
+          ? "border-white/10 bg-white/5"
+          : isWinner
+            ? "border-arena-500/40 bg-arena-500/5 shadow-[0_0_50px_rgba(61,217,184,0.1)]"
+            : "border-flame-500/20 bg-flame-500/5"
+      }`}
     >
-      <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${isWinner ? 'from-arena-500' : 'from-flame-500'} to-transparent opacity-50`} />
+      <div
+        className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${
+          isDraw ? "from-white/30" : isWinner ? "from-arena-500" : "from-flame-500"
+        } to-transparent opacity-50`}
+      />
       <div className="flex items-center justify-between gap-3 mb-6">
-        <div className={`text-xs uppercase tracking-[0.24em] font-bold ${isWinner ? "text-arena-400" : "text-flame-400"}`}>{title}</div>
+        <div
+          className={`text-xs uppercase tracking-[0.24em] font-bold ${
+            isDraw ? "text-paper-200/70" : isWinner ? "text-arena-400" : "text-flame-400"
+          }`}
+        >
+          {title}
+        </div>
         {isWinner ? <Crown size={20} className="text-arena-400 drop-shadow-[0_0_10px_rgba(61,217,184,0.8)]" /> : null}
       </div>
 
@@ -39,8 +55,12 @@ function ResultPlayerCard({ title, players, isWinner }) {
               </div>
               <div className="text-right">
                 <div className="text-[10px] uppercase tracking-[0.22em] text-paper-200/50 font-bold mb-1">Match Delta</div>
-                <div className={`text-lg font-bold font-mono ${isWinner ? "text-arena-400" : "text-flame-400"}`}>
-                  {isWinner ? '+' : '-'}{isWinner ? player.rewardWon : player.coinContribution || 0}
+                <div
+                  className={`text-lg font-bold font-mono ${
+                    isDraw ? "text-paper-100" : isWinner ? "text-arena-400" : "text-flame-400"
+                  }`}
+                >
+                  {isDraw ? "0" : `${isWinner ? "+" : "-"}${isWinner ? player.rewardWon : player.coinContribution || 0}`}
                 </div>
               </div>
             </div>
@@ -133,15 +153,24 @@ function MatchResultPage() {
       return transientResult;
     }
 
+    const pick = (key, fallback) => {
+      if (!transientResult) {
+        return fallback;
+      }
+
+      return Object.prototype.hasOwnProperty.call(transientResult, key) ? transientResult[key] : fallback;
+    };
+
     return {
-      winnerId: transientResult?.winnerId || match.winner?.id || match.winner?._id || match.winner,
-      winnerTeam: transientResult?.winnerTeam || match.winnerTeam,
-      prizePool: transientResult?.prizePool || match.prizePool,
-      perWinnerReward:
-        transientResult?.perWinnerReward ||
-        Math.floor((match.prizePool || 0) / Math.max(match.teamSize || 1, 1)),
-      rewardedUserIds: transientResult?.rewardedUserIds || [],
-      reason: transientResult?.reason,
+      winnerId: pick("winnerId", match.winner?.id || match.winner?._id || match.winner || null),
+      winnerTeam: pick("winnerTeam", match.winnerTeam ?? null),
+      prizePool: pick("prizePool", match.prizePool ?? 0),
+      perWinnerReward: pick(
+        "perWinnerReward",
+        Math.floor((match.prizePool || 0) / Math.max(match.teamSize || 1, 1))
+      ),
+      rewardedUserIds: pick("rewardedUserIds", []),
+      reason: pick("reason", undefined),
     };
   }, [match, transientResult]);
 
@@ -151,32 +180,46 @@ function MatchResultPage() {
 
   const yourTeam = [match.currentPlayer, ...(match.teammates || [])].filter(Boolean);
   const opposingTeam = match.opponents || [];
-  const yourTeamWon = resolvedResult.winnerTeam === match.currentPlayer?.team;
-  const winningPlayers = yourTeamWon ? yourTeam : opposingTeam;
-  const losingPlayers = yourTeamWon ? opposingTeam : yourTeam;
+
+  const isDraw = resolvedResult.winnerTeam == null && resolvedResult.winnerId == null;
+  const yourTeamWon = !isDraw
+    ? resolvedResult.winnerTeam != null
+      ? resolvedResult.winnerTeam === match.currentPlayer?.team
+      : resolvedResult.winnerId === user?.id
+    : false;
+
+  const winningPlayers = isDraw ? [] : yourTeamWon ? yourTeam : opposingTeam;
+  const losingPlayers = isDraw ? [] : yourTeamWon ? opposingTeam : yourTeam;
 
   const rewardMap = new Set(resolvedResult.rewardedUserIds || []);
   const decoratedWinningPlayers = winningPlayers.map((player) => ({
     ...player,
     rewardWon: rewardMap.size === 0 || rewardMap.has(player.id) ? resolvedResult.perWinnerReward : 0,
   }));
-  const winnerHeadline =
-    match.mode === "1v1"
+
+  const winnerHeadline = isDraw
+    ? "Time Expired"
+    : match.mode === "1v1"
       ? `${decoratedWinningPlayers[0]?.username || "A player"} Wins!`
       : yourTeamWon
         ? "Your Team Wins!"
         : "Opposing Team Wins!";
+
+  const prizeTitle = isDraw ? "Entry Refunded" : "Prize Pool Claimed";
+  const yourContribution = match.currentPlayer?.coinContribution ?? match.entryCoins ?? 0;
+  const coinDelta = isDraw ? 0 : yourTeamWon ? resolvedResult.perWinnerReward : -yourContribution;
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-100px)] w-full max-w-7xl items-center justify-center my-6">
       <div className="grid w-full gap-6 arena-celebrate-in xl:grid-cols-[1fr_1.2fr_1fr] items-end">
         
        
-        <div className={`transition-all duration-1000 transform ${yourTeamWon ? 'translate-y-8' : ''}`}>
+        <div className={`transition-all duration-1000 transform ${yourTeamWon ? "translate-y-8" : ""}`}>
            <ResultPlayerCard 
-             title={yourTeamWon ? "Defeated" : "Your Team (Defeated)"} 
-             players={yourTeamWon ? losingPlayers : decoratedWinningPlayers} 
-             isWinner={false} 
+             title={isDraw ? "Your Team" : yourTeamWon ? "Defeated" : "Your Team (Defeated)"} 
+             players={isDraw ? yourTeam : yourTeamWon ? losingPlayers : decoratedWinningPlayers} 
+             isWinner={false}
+             isDraw={isDraw}
            />
         </div>
 
@@ -185,7 +228,7 @@ function MatchResultPage() {
           {yourTeamWon && <div className="absolute inset-0 opacity-30 pointer-events-none bg-[radial-gradient(circle_at_center,rgba(61,217,184,1)_0%,transparent_100%)] bg-[length:15px_15px] mix-blend-screen animate-pulse" />}
 
           <div className="rounded-full border border-white/10 bg-black/40 px-6 py-2 text-sm uppercase tracking-[0.3em] font-bold text-white shadow-inner relative z-10">
-             {yourTeamWon ? "Victory" : "Defeat"}
+             {isDraw ? "Match Ended" : yourTeamWon ? "Victory" : "Defeat"}
           </div>
           
           <div className="mt-8 flex items-center gap-4 text-4xl font-black relative z-10">
@@ -196,21 +239,26 @@ function MatchResultPage() {
           </div>
 
           <div className="mt-4 text-sm text-paper-200/80 font-medium relative z-10 bg-black/40 px-6 py-2 rounded-full border border-white/5">
-            {resolvedResult.reason || (yourTeamWon ? "You captured the full VS chest." : "The other side claimed the chest first.")}
+            {resolvedResult.reason ||
+              (isDraw
+                ? "Time expired. Entry coins were refunded."
+                : yourTeamWon
+                  ? "You captured the full VS chest."
+                  : "The other side claimed the chest first.")}
           </div>
 
           <div className={`w-full mt-10 rounded-[2rem] border bg-black/40 backdrop-blur-md px-8 py-10 relative z-10 overflow-hidden ${yourTeamWon ? "border-arena-500/30 shadow-[inset_0_0_50px_rgba(61,217,184,0.1)]" : "border-flame-500/30 shadow-[inset_0_0_50px_rgba(255,138,61,0.1)]"}`}>
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-yellow-500 to-transparent opacity-50" />
-            <div className="text-xs uppercase tracking-[0.28em] text-yellow-500/80 font-bold">Prize Pool Claimed</div>
+            <div className="text-xs uppercase tracking-[0.28em] text-yellow-500/80 font-bold">{prizeTitle}</div>
             <div className="mt-4 text-6xl font-black text-white drop-shadow-[0_0_20px_rgba(234,179,8,0.4)]">{resolvedResult.prizePool}</div>
             <div className="mt-1 text-sm font-bold text-yellow-500 uppercase tracking-widest">Coins</div>
             
             <div className="mt-6 pt-6 border-t border-white/10 flex flex-col items-center gap-3">
               <div className={`inline-flex items-center gap-2 rounded-full border px-6 py-3 text-2xl font-black ${yourTeamWon ? 'border-arena-500/40 bg-arena-500/20 text-arena-400 drop-shadow-[0_0_15px_rgba(61,217,184,0.6)]' : 'border-flame-500/40 bg-flame-500/20 text-flame-400 drop-shadow-[0_0_15px_rgba(255,138,61,0.6)]'}`}>
-                {yourTeamWon ? '+' : '-'}{resolvedResult.perWinnerReward} Coins
+                {coinDelta >= 0 ? "+" : "-"}{Math.abs(coinDelta)} Coins
               </div>
               <div className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-lg font-bold ${yourTeamWon ? 'border-arena-500/20 bg-arena-500/10 text-arena-400/80' : 'border-flame-500/20 bg-flame-500/10 text-flame-400/80'}`}>
-                {yourTeamWon ? '+25' : '-15'} ELO
+                {isDraw ? "0" : yourTeamWon ? "+25" : "-15"} ELO
               </div>
             </div>
           </div>
@@ -233,11 +281,12 @@ function MatchResultPage() {
           </div>
         </section>
 
-        <div className={`transition-all duration-1000 transform ${!yourTeamWon ? 'translate-y-8' : ''}`}>
+        <div className={`transition-all duration-1000 transform ${!yourTeamWon ? "translate-y-8" : ""}`}>
            <ResultPlayerCard 
-             title={yourTeamWon ? "Your Team (Winner)" : "Winning Side"} 
-             players={yourTeamWon ? decoratedWinningPlayers : losingPlayers} 
-             isWinner={true} 
+             title={isDraw ? "Opponents" : yourTeamWon ? "Your Team (Winner)" : "Winning Side"} 
+             players={isDraw ? opposingTeam : yourTeamWon ? decoratedWinningPlayers : losingPlayers} 
+             isWinner={!isDraw}
+             isDraw={isDraw}
            />
         </div>
       </div>

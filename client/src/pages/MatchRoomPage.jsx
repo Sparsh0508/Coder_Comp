@@ -8,7 +8,7 @@ import ResultBanner from "../components/ResultBanner";
 import { useAuth } from "../context/AuthContext";
 import useCountdown from "../hooks/useCountdown";
 import useMatchSocket from "../hooks/useMatchSocket";
-import { getMatchById } from "../services/matchService";
+import { forfeitMatch, getMatchById, timeoutMatch } from "../services/matchService";
 import { runSubmission, submitSubmission } from "../services/submissionService";
 
 const defaultTemplates = {
@@ -45,6 +45,7 @@ function MatchRoomPage() {
   const [notice, setNotice] = useState(location.state?.notice || "");
   const loadedMatchIdRef = useRef(null);
   const hasNavigatedToResultRef = useRef(false);
+  const hasHandledTimeoutRef = useRef(false);
 
   const updateRosterPlayer = (players, payload) =>
     players.map((player) =>
@@ -191,10 +192,39 @@ function MatchRoomPage() {
 
   useEffect(() => {
     if (timer === "00:00" && !result && match?.status !== "completed") {
-      setResult({
-        winnerTeam: match?.currentPlayer?.team === 1 ? 2 : 1,
-        reason: "Time ran out before you finished the hidden suite.",
-      });
+      if (hasHandledTimeoutRef.current) {
+        return;
+      }
+
+      hasHandledTimeoutRef.current = true;
+
+      timeoutMatch(matchId)
+        .then((response) => {
+          setResult(response.result);
+          refreshUser().catch(() => {});
+          if (!hasNavigatedToResultRef.current) {
+            hasNavigatedToResultRef.current = true;
+            navigate(`/match/${matchId}/result`, { state: { result: response.result }, replace: true });
+          }
+        })
+        .catch(() => {
+          // Even if the API fails (server crash/network), move the player out of the editor UI.
+          const fallback = {
+            winnerTeam: null,
+            winnerId: null,
+            prizePool: match?.prizePool ?? 0,
+            perWinnerReward: 0,
+            reason: "Time ran out. Unable to finalize match cleanup, please refresh.",
+          };
+
+          setResult(fallback);
+          refreshUser().catch(() => {});
+
+          if (!hasNavigatedToResultRef.current) {
+            hasNavigatedToResultRef.current = true;
+            navigate(`/match/${matchId}/result`, { state: { result: fallback }, replace: true });
+          }
+        });
     }
   }, [match, result, timer]);
 
@@ -307,7 +337,17 @@ function MatchRoomPage() {
             />
           </div>
           <div className="flex justify-end">
-            <button className="arena-button-secondary" onClick={() => navigate("/dashboard")}>
+            <button
+              className="arena-button-secondary"
+              onClick={async () => {
+                try {
+                  const response = await forfeitMatch(matchId);
+                  setResult(response.result);
+                } catch {}
+                refreshUser().catch(() => {});
+                navigate("/dashboard");
+              }}
+            >
               Leave arena
             </button>
           </div>

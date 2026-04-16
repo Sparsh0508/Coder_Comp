@@ -3,10 +3,18 @@ const path = require("path");
 const winston = require("winston");
 const DailyRotateFile = require("winston-daily-rotate-file");
 
-const LOG_DIR = path.join(__dirname, "..", "logs");
+const LOG_DIR = process.env.LOG_DIR ? path.resolve(process.env.LOG_DIR) : path.join(__dirname, "..", "logs");
 
-if (!fs.existsSync(LOG_DIR)) {
-  fs.mkdirSync(LOG_DIR, { recursive: true });
+let canWriteLogFiles = true;
+try {
+  if (!fs.existsSync(LOG_DIR)) {
+    fs.mkdirSync(LOG_DIR, { recursive: true });
+  }
+  const probePath = path.join(LOG_DIR, ".write_probe");
+  fs.writeFileSync(probePath, "ok");
+  fs.unlinkSync(probePath);
+} catch {
+  canWriteLogFiles = false;
 }
 
 const jsonFormat = winston.format.combine(
@@ -30,14 +38,31 @@ const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || (process.env.NODE_ENV === "production" ? "info" : "debug"),
   format: jsonFormat,
   defaultMeta: { service: "codecamp-arena" },
-  transports: [
-    createRotateTransport("app-%DATE%.log", "info"),
-    createRotateTransport("error-%DATE%.log", "error"),
-  ],
+  transports: [],
 });
 
 if (process.env.NODE_ENV !== "production") {
   logger.add(new winston.transports.Console({ format: jsonFormat }));
+}
+
+if (canWriteLogFiles) {
+  const appTransport = createRotateTransport("app-%DATE%.log", "info");
+  const errorTransport = createRotateTransport("error-%DATE%.log", "error");
+
+  
+  [appTransport, errorTransport].forEach((transport) => {
+    transport.on("error", (error) => {
+     
+      console.error("Logger transport error, disabling file logging:", error?.message || error);
+      try {
+        logger.remove(transport);
+      } catch {}
+    });
+
+    logger.add(transport);
+  });
+} else {
+  console.warn("File logging disabled: unable to create/write in LOG_DIR:", LOG_DIR);
 }
 
 function logModule(moduleName, level, message, meta = {}) {
