@@ -1,60 +1,118 @@
-const mongoose = require("mongoose");
+const mongoose =
+   require("mongoose");
 
-const testCaseSchema = new mongoose.Schema(
-  {
-    input: {
-      type: String,
-      required: true,
-    },
-    output: {
-      type: String,
-      required: true,
-    },
-    explanation: {
-      type: String,
-      default: "",
-    },
-  },
-  { _id: false }
-);
+const ProblemSchema =
+   new mongoose.Schema({
 
-const problemSchema = new mongoose.Schema(
-  {
-    title: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    description: {
-      type: String,
-      required: true,
-    },
-    constraints: {
-      type: [String],
-      default: [],
-    },
-    difficulty: {
-      type: String,
-      enum: ["Easy", "Medium", "Hard"],
-      default: "Medium",
-    },
-    starterCode: {
-      cpp: { type: String, default: "" },
-      java: { type: String, default: "" },
-      python: { type: String, default: "" },
-    },
-    sampleTestCases: {
-      type: [testCaseSchema],
-      default: [],
-    },
-    hiddenTestCases: {
-      type: [testCaseSchema],
-      default: [],
-    },
-  },
-  {
-    timestamps: true,
-  }
-);
+      title: {
+         type: String,
+         required: true
+      },
 
-module.exports = mongoose.model("Problem", problemSchema);
+      description: {
+         type: String,
+         required: true
+      },
+
+      inputFormat: {
+         type: String,
+         required: true
+      },
+
+      outputFormat: {
+         type: String,
+         required: true
+      },
+
+      constraints: {
+         type: [String],
+         default: []
+      },
+
+      sampleInput: {
+         type: String
+      },
+
+      sampleOutput: {
+         type: String
+      },
+
+      explanation: {
+         type: String
+      },
+
+      tags: {
+         type: [String],
+         default: []
+      },
+
+      difficulty: {
+         type: String,
+         enum: [
+            "Easy",
+            "Medium",
+            "Hard"
+         ],
+         default: "Easy"
+      },
+
+      structure: {
+
+         pattern: String,
+
+         concepts: [String],
+
+         mutation: {
+            type: Object
+         },
+
+         constraints: {
+            type: Object
+         },
+
+         theme: String
+      },
+
+      editorial: {
+
+         intuition: String,
+
+         bruteForce: String,
+
+         optimized: String,
+
+         timeComplexity: String,
+
+         spaceComplexity: String,
+
+         edgeCases: [String]
+      },
+
+      referenceSolution: {
+
+         code: String,
+
+         language: String,
+
+         complexity: String
+      },
+
+      hiddenTests: [
+         {
+            input: Object,
+            output: String
+         }
+      ],
+
+      createdAt: {
+         type: Date,
+         default: Date.now
+      }
+
+   });
+
+module.exports =
+   mongoose.model(
+      "Problem",
+      ProblemSchema
+   );
