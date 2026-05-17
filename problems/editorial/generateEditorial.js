@@ -5,6 +5,10 @@ const {
 const buildEditorialPrompt =
    require("./buildEditorialPrompt");
 
+const {
+   parseJsonResponse
+} = require("../utils/parseJsonResponse");
+
 const genAI =
    new GoogleGenerativeAI(
       process.env.GEMINI_API_KEY
@@ -27,16 +31,13 @@ async function generateEditorial(
          prompt
       );
 
-   const response =
+   const text =
       result.response.text();
 
-   const clean =
-      response
-         .replace(/```json/g, "")
-         .replace(/```/g, "")
-         .trim();
-
-   return JSON.parse(clean);
+   return parseJsonResponse(
+      text,
+      "Editorial response"
+   );
 }
 
 module.exports =

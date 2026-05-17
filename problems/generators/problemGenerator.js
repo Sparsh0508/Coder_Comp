@@ -31,6 +31,16 @@ const Problem =
 const themes =
    require("../utils/themes");
 
+function normalizeDifficulty(difficulty) {
+   const map = {
+      easy: "Easy",
+      medium: "Medium",
+      hard: "Hard"
+   };
+
+   return map[String(difficulty).toLowerCase()] || "Easy";
+}
+
 async function generateProblem(
    difficulty = "easy"
 ) {
@@ -128,6 +138,11 @@ async function generateProblem(
             await Problem.create({
 
                ...aiProblem,
+
+               difficulty:
+                  normalizeDifficulty(
+                     aiProblem.difficulty || difficulty
+                  ),
 
                structure,
 

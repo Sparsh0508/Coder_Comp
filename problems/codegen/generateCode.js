@@ -5,6 +5,11 @@ const {
 const buildCodePrompt =
    require("./buildCodePrompt");
 
+const {
+   parseJsonResponse,
+   stripCodeFence
+} = require("../utils/parseJsonResponse");
+
 const genAI =
    new GoogleGenerativeAI(
       process.env.GEMINI_API_KEY
@@ -27,16 +32,29 @@ async function generateCode(
          prompt
       );
 
-   const response =
+   const text =
       result.response.text();
 
-   const clean =
-      response
-         .replace(/```json/g, "")
-         .replace(/```/g, "")
+   try {
+      return parseJsonResponse(
+         text,
+         "Reference solution response"
+      );
+   } catch(error) {
+      const code = stripCodeFence(text)
+         .replace(/^cpp\s*/i, "")
          .trim();
 
-   return JSON.parse(clean);
+      if(code.includes("#include") || code.includes("int main")) {
+         return {
+            code,
+            language: "cpp",
+            complexity: "See editorial"
+         };
+      }
+
+      throw error;
+   }
 }
 
 module.exports =

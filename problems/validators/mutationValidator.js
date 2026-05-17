@@ -15,8 +15,15 @@ function validateMutation(structure, problem) {
       mutation.type === "distance_constraint"
    ) {
 
+      const minDistance =
+         mutation.minDistance;
+
       const text = (
          problem.description +
+         " " +
+         problem.inputFormat +
+         " " +
+         (problem.constraints || []).join(" ") +
          " " +
          problem.explanation
       ).toLowerCase();
@@ -24,7 +31,11 @@ function validateMutation(structure, problem) {
       const hasDistanceRule =
          text.includes("distance") ||
          text.includes("|i - j|") ||
-         text.includes("index difference");
+         text.includes("|i-j|") ||
+         text.includes("index difference") ||
+         text.includes("indices differ") ||
+         text.includes(`at least ${minDistance}`) ||
+         text.includes(`minimum ${minDistance}`);
 
       if(!hasDistanceRule) {
 

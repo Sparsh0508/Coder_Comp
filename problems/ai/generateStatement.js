@@ -4,6 +4,10 @@ const model =
 const buildPrompt =
    require("./promptBuilder");
 
+const {
+   parseJsonResponse
+} = require("../utils/parseJsonResponse");
+
 async function generateStatement(problemData) {
 
    const prompt =
@@ -18,12 +22,10 @@ async function generateStatement(problemData) {
    const text =
       response.text();
 
-   const cleanedText = text
-      .replace(/```json/g, "")
-      .replace(/```/g, "")
-      .trim();
-
-   return JSON.parse(cleanedText);
+   return parseJsonResponse(
+      text,
+      "Problem statement response"
+   );
 }
 
 module.exports =
