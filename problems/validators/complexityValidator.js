@@ -10,8 +10,16 @@ function validateComplexity(
    const text =
       JSON.stringify(problem);
 
+   const normalizedExpected =
+      String(expected || "")
+         .replace(/\s+/g, "")
+         .toLowerCase();
+
    if(
-      expected === "O(n²)" &&
+      (
+         normalizedExpected === "o(n^2)" ||
+         normalizedExpected === "o(n²)"
+      ) &&
       text.includes("10^5")
    ) {
 

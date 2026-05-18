@@ -33,6 +33,25 @@ The problem MUST contain a rule:
 This rule must directly affect which pairs are valid.
 `;
 
+      case "target_sum_count":
+
+         return `
+The problem MUST count index pairs (i, j) where:
+- i < j
+- arr[i] + arr[j] = target
+
+Duplicate values create multiple index-distinct pairs.
+The intended solution should use a frequency map.
+`;
+
+      case "negative_values_allowed":
+
+         return `
+The problem MUST allow negative values.
+This means sliding window logic is not generally valid.
+The intended solution should use prefix sums and a hashmap.
+`;
+
       default:
 
          return "";

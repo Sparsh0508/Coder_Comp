@@ -12,6 +12,9 @@ services:
       context: ./server
     env_file:
       - ./server/.env
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/codecamp_arena
+      CODE_RUNNER_URL: http://code-runner:5001
     depends_on:
       - mongo
       - code-runner

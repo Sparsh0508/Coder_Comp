@@ -18,6 +18,18 @@ const defaultTemplates = {
 };
 
 function formatResultOutput(result) {
+  if (Number.isInteger(result?.hiddenTotalCount)) {
+    const sampleTotal = Math.max(0, (result.totalCount || 0) - result.hiddenTotalCount);
+    const samplePassed = Math.max(0, (result.passedCount || 0) - result.hiddenPassedCount);
+
+    return [
+      `Hidden test cases: ${result.hiddenPassedCount}/${result.hiddenTotalCount} passed`,
+      `Sample test cases: ${samplePassed}/${sampleTotal} passed`,
+      `Total test cases: ${result.passedCount}/${result.totalCount} passed`,
+      `Status: ${result.allPassed ? "Accepted" : "Failed"}`,
+    ].join("\n");
+  }
+
   if (!result?.testCases?.length) {
     return "No execution data yet.";
   }
@@ -28,6 +40,21 @@ function formatResultOutput(result) {
         `Test ${index + 1}: ${testCase.passed ? "PASS" : "FAIL"}\nExpected: ${testCase.expectedOutput}\nActual: ${testCase.actualOutput}\nStatus: ${testCase.status}`
     )
     .join("\n\n");
+}
+
+function formatProgressOutput(progress) {
+  const sampleTotal = Math.max(0, (progress.totalTests || 0) - progress.hiddenTotalCount);
+  const sampleCompleted = Math.min(sampleTotal, progress.completedTests || 0);
+  const samplePassed = Math.max(0, (progress.passedTests || 0) - progress.hiddenPassedCount);
+
+  return [
+    "Submitting...",
+    `Hidden test cases: ${progress.hiddenPassedCount}/${progress.hiddenTotalCount} passed`,
+    `Hidden checked: ${progress.hiddenCompletedCount}/${progress.hiddenTotalCount}`,
+    `Sample test cases: ${samplePassed}/${sampleTotal} passed`,
+    `Sample checked: ${sampleCompleted}/${sampleTotal}`,
+    `Total checked: ${progress.completedTests}/${progress.totalTests}`,
+  ].join("\n");
 }
 
 function MatchRoomPage() {
@@ -82,6 +109,40 @@ function MatchRoomPage() {
             }
           : current
       );
+    },
+    onSubmissionProgress(payload) {
+      setMatch((current) => {
+        if (!current) {
+          return current;
+        }
+
+        const rosterPayload = {
+          ...payload,
+          hasSubmitted: true,
+          isTyping: false,
+          status: "submitted",
+        };
+
+        if (payload.userId === current.currentPlayer?.id) {
+          setOutput(formatProgressOutput(payload));
+          return {
+            ...current,
+            currentPlayer: {
+              ...current.currentPlayer,
+              passedTests: payload.passedTests,
+              totalTests: payload.totalTests,
+              hasSubmitted: true,
+              status: "submitted",
+            },
+          };
+        }
+
+        return {
+          ...current,
+          teammates: updateRosterPlayer(current.teammates || [], rosterPayload),
+          opponents: updateRosterPlayer(current.opponents || [], rosterPayload),
+        };
+      });
     },
     onSubmissionResult(payload) {
       setMatch((current) => {
@@ -254,6 +315,7 @@ function MatchRoomPage() {
 
   const handleSubmit = async () => {
     setSubmitting(true);
+    setOutput("Submitting...\nWaiting for judge progress.");
     try {
       const response = await submitSubmission({
         matchId,

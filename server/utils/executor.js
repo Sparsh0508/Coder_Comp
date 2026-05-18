@@ -1,7 +1,6 @@
 async function createLocalSubmission({ sourceCode, language, stdin }) {
   const baseUrl = process.env.CODE_RUNNER_URL || "http://localhost:5001";
-  console.log(baseUrl);
-  
+
   const response = await fetch(`${baseUrl}/api/execute`, {
     method: "POST",
     headers: {
@@ -26,7 +25,7 @@ function normalizeOutput(value = "") {
   return String(value).trim().replace(/\r\n/g, "\n");
 }
 
-async function evaluateCode({ sourceCode, language, testCases }) {
+async function evaluateCode({ sourceCode, language, testCases, onProgress }) {
   const supportedLanguages = new Set(["cpp", "java", "python"]);
 
   if (!supportedLanguages.has(language)) {
@@ -35,7 +34,8 @@ async function evaluateCode({ sourceCode, language, testCases }) {
 
   const results = [];
 
-  for (const testCase of testCases) {
+  for (let index = 0; index < testCases.length; index += 1) {
+    const testCase = testCases[index];
     const execution = await createLocalSubmission({
       sourceCode,
       language,
@@ -55,6 +55,14 @@ async function evaluateCode({ sourceCode, language, testCases }) {
       memory: Number(execution.memory || 0),
       status: execution.status || "Unknown",
     });
+
+    if (onProgress) {
+      await onProgress({
+        index,
+        result: results[results.length - 1],
+        results: [...results],
+      });
+    }
   }
 
   const passedCount = results.filter((result) => result.passed).length;

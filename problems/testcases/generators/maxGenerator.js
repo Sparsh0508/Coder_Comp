@@ -1,6 +1,7 @@
-function generateMaxTest() {
+function generateMaxTest(options = {}) {
 
-   const n = 1000;
+   const n =
+      Math.min(options.n || 1000, 100000);
 
    const arr = [];
 
@@ -14,7 +15,7 @@ function generateMaxTest() {
    return {
       n,
       arr,
-      minDistance: 2
+      minDistance: options.minDistance || 2
    };
 }
 

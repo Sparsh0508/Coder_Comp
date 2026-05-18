@@ -1,6 +1,7 @@
 const Match = require("../models/Match");
 const { awardPrizePool } = require("./matchEconomy");
 const { logMatch } = require("./logger");
+const { applyMatchStatsOnce } = require("./matchStats");
 const { clearUsersActiveMatch } = require("./userMatchState");
 
 function getOtherTeam(team) {
@@ -60,8 +61,25 @@ async function forfeitMatchByUser({ io, matchId, userId, reason }) {
     match.winner = winningPlayer.user._id || winningPlayer.user;
   }
 
+  const completion = await Match.updateOne(
+    { _id: match._id, status: { $in: ["lobby", "active"] } },
+    {
+      $set: {
+        status: match.status,
+        winner: match.winner,
+        winnerTeam: match.winnerTeam,
+        endedAt: match.endedAt,
+        players: match.players,
+      },
+    }
+  );
+
+  if (!completion.modifiedCount) {
+    return null;
+  }
+
+  await applyMatchStatsOnce(match, winningTeam);
   const rewardSummary = await awardPrizePool(match, winningTeam);
-  await match.save();
   await clearUsersActiveMatch(match.players.map((entry) => entry.user._id.toString()));
 
   if (io) {

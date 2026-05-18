@@ -4,19 +4,27 @@ function optimizedSolve(
 ) {
 
    let count = 0;
+   const eligibleCounts =
+      new Map();
 
-   for(let i = 0; i < arr.length; i++) {
+   for(let j = 0; j < arr.length; j++) {
 
-      for(let j = i + 1; j < arr.length; j++) {
+      const eligibleIndex =
+         j - minDistance;
 
-         if(
-            arr[i] === arr[j] &&
-            Math.abs(i - j) >= minDistance
-         ) {
+      if(eligibleIndex >= 0) {
 
-            count++;
-         }
+         const eligibleValue =
+            arr[eligibleIndex];
+
+         eligibleCounts.set(
+            eligibleValue,
+            (eligibleCounts.get(eligibleValue) || 0) + 1
+         );
       }
+
+      count +=
+         eligibleCounts.get(arr[j]) || 0;
    }
 
    return count;

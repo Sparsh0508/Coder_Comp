@@ -1,12 +1,3 @@
-const pairMatching =
-   require("../patterns/pairMatching");
-
-const mutationEngine =
-   require("../mutations/mutationEngine");
-
-const constraintEngine =
-   require("../constraints/constraintEngine");
-
 const generateStatement =
    require("../ai/generateStatement");
 
@@ -16,20 +7,15 @@ const validateProblem =
 const generateEditorial =
    require("../editorial/generateEditorial");
 
-const generateCode =
-   require("../codegen/generateCode");
-
-const buildHiddenTests =
-   require("../testcases/hidden/buildHiddenTests");
-
-const generateOutputs =
-   require("../testcases/hidden/generateOutputs");
-
 const Problem =
    require("../../server/models/Problem");
 
 const themes =
    require("../utils/themes");
+
+const {
+   selectProblemFamily
+} = require("../specs/problemFamilies");
 
 function normalizeDifficulty(difficulty) {
    const map = {
@@ -42,10 +28,14 @@ function normalizeDifficulty(difficulty) {
 }
 
 async function generateProblem(
-   difficulty = "easy"
+   difficulty = "easy",
+   options = {}
 ) {
 
    const MAX_RETRIES = 5;
+   const errors = [];
+   const requestedDifficulty =
+      String(difficulty || "easy").toLowerCase();
 
    for(
       let attempt = 1;
@@ -55,14 +45,9 @@ async function generateProblem(
 
       try {
 
-         const mutation =
-            mutationEngine.applyMutation(
-               pairMatching
-            );
-
-         const constraints =
-            constraintEngine.generateConstraints(
-               difficulty
+         const family =
+            selectProblemFamily(
+               options.family || options.pattern
             );
 
          const theme =
@@ -73,32 +58,39 @@ async function generateProblem(
                )
             ];
 
-         const structure = {
+         const structure =
+            family.createStructure({
+               difficulty:
+                  requestedDifficulty,
+               theme
+            });
 
-            pattern:
-               pairMatching.name,
-
-            concepts:
-               pairMatching.concepts,
-
-            mutation,
-
-            constraints,
-
-            theme
-         };
-
-       
          const aiProblem =
             await generateStatement(
                structure
             );
 
-        
+         const canonicalProblem =
+            family.normalizeProblem(
+               aiProblem,
+               structure
+            );
+
+         const sampleTestCases =
+            family.buildSamples(
+               structure
+            );
+
+         canonicalProblem.sampleInput =
+            sampleTestCases[0]?.input;
+
+         canonicalProblem.sampleOutput =
+            sampleTestCases[0]?.output;
+
          const validation =
             validateProblem(
                structure,
-               aiProblem
+               canonicalProblem
             );
 
          if(!validation.valid) {
@@ -108,58 +100,91 @@ async function generateProblem(
                validation.error
             );
 
+            errors.push(
+               `Attempt ${attempt}: ${validation.error}`
+            );
+
             continue;
          }
 
-       
-         const editorial =
-            await generateEditorial(
-               aiProblem
+         let editorial;
+
+         try {
+            editorial =
+               await generateEditorial(
+                  canonicalProblem
+               );
+         } catch(error) {
+            console.log(
+               `Attempt ${attempt} editorial fallback:`,
+               error.message
             );
 
-       
-         const referenceSolution =
-            await generateCode(
-               aiProblem
-            );
+            editorial =
+               family.buildFallbackEditorial(
+                  canonicalProblem,
+                  structure
+               );
+         }
 
-         
          const hiddenTests =
-            buildHiddenTests();
-
-         
-         const outputs =
-            generateOutputs(
-               hiddenTests
+            family.buildHiddenTests(
+               structure
             );
 
-         
+         const outputs =
+            family.generateOutputs(
+               hiddenTests,
+               structure
+            );
+
          const savedProblem =
             await Problem.create({
 
-               ...aiProblem,
+               ...canonicalProblem,
 
                difficulty:
                   normalizeDifficulty(
-                     aiProblem.difficulty || difficulty
+                     requestedDifficulty
                   ),
+
+               starterCode:
+                  family.buildStarterCode(
+                     structure
+                  ),
+
+               sampleInput:
+                  sampleTestCases[0]?.input,
+
+               sampleOutput:
+                  sampleTestCases[0]?.output,
+
+               sampleTestCases,
 
                structure,
 
                editorial,
 
-               referenceSolution,
+               referenceSolution:
+                  family.buildReferenceSolution(
+                     structure
+                  ),
 
-               hiddenTests: outputs
+               hiddenTestCases:
+                  outputs
             });
 
          console.log(
-            `Generation succeeded on attempt ${attempt}`
+            `Generation succeeded on attempt ${attempt} (${family.id})`
          );
 
          return savedProblem;
 
       } catch(error) {
+
+         errors.push(
+            `Attempt ${attempt}: ${error.message}`
+         );
 
          console.log(
             `Attempt ${attempt} crashed:`,
@@ -169,7 +194,7 @@ async function generateProblem(
    }
 
    throw new Error(
-      "Failed to generate valid problem"
+      `Failed to generate valid problem. ${errors.join(" | ")}`
    );
 }
 

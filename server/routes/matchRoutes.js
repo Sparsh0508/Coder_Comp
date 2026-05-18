@@ -8,6 +8,7 @@ const router = express.Router();
 router.post("/find", authMiddleware, matchController.findMatch);
 router.post("/leave", authMiddleware, matchController.leaveQueue);
 router.get("/active/current", authMiddleware, matchController.getActiveMatch);
+router.get("/recent", authMiddleware, matchController.getRecentMatches);
 router.post("/:matchId/timeout", authMiddleware, matchController.timeoutMatch);
 router.post("/:matchId/forfeit", authMiddleware, matchController.forfeitMatch);
 router.get("/:matchId", authMiddleware, matchController.getMatch);

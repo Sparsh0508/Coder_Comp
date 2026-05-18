@@ -1,11 +1,37 @@
 const Match = require("../models/Match");
 const Problem = require("../models/Problem");
 const Submission = require("../models/Submission");
-const User = require("../models/User");
 const { awardPrizePool } = require("../utils/matchEconomy");
 const { clearUsersActiveMatch } = require("../utils/userMatchState");
 const { evaluateCode } = require("../utils/executor");
-const { calculateElo } = require("../utils/elo");
+const { applyMatchStatsOnce } = require("../utils/matchStats");
+
+function publicEvaluation(evaluation, includeCases = false, extra = {}) {
+  const base = {
+    allPassed: evaluation.allPassed,
+    passedCount: evaluation.passedCount,
+    totalCount: evaluation.totalCount,
+    maxTime: evaluation.maxTime,
+    maxMemory: evaluation.maxMemory,
+    ...extra,
+  };
+
+  if (includeCases) {
+    base.testCases = evaluation.testCases;
+    base.outputSummary = evaluation.outputSummary;
+  }
+
+  return base;
+}
+
+function buildHiddenSummary(evaluation, sampleCount) {
+  const hiddenResults = evaluation.testCases.slice(sampleCount);
+
+  return {
+    hiddenPassedCount: hiddenResults.filter((result) => result.passed).length,
+    hiddenTotalCount: hiddenResults.length,
+  };
+}
 
 function buildMatchSummary(match, winnerId, winnerTeam, rewardSummary = {}) {
   return {
@@ -18,38 +44,6 @@ function buildMatchSummary(match, winnerId, winnerTeam, rewardSummary = {}) {
     rewardedUserIds: rewardSummary.rewardedUserIds || [],
     perWinnerReward: rewardSummary.perWinnerReward || 0,
   };
-}
-
-async function updateTeamRatings(match, winningTeam) {
-  const winners = match.players.filter((player) => player.team === winningTeam);
-  const losers = match.players.filter((player) => player.team !== winningTeam);
-
-  if (!winners.length || !losers.length) {
-    return;
-  }
-
-  const winnerUsers = await User.find({ _id: { $in: winners.map((player) => player.user._id) } });
-  const loserUsers = await User.find({ _id: { $in: losers.map((player) => player.user._id) } });
-
-  const averageWinnerRating = winnerUsers.reduce((sum, user) => sum + user.rating, 0) / winnerUsers.length;
-  const averageLoserRating = loserUsers.reduce((sum, user) => sum + user.rating, 0) / loserUsers.length;
-  const { winnerRating, loserRating } = calculateElo(averageWinnerRating, averageLoserRating);
-  const winnerDelta = winnerRating - Math.round(averageWinnerRating);
-  const loserDelta = loserRating - Math.round(averageLoserRating);
-
-  winnerUsers.forEach((user) => {
-    user.rating += winnerDelta;
-    user.wins += 1;
-    user.totalMatches += 1;
-  });
-
-  loserUsers.forEach((user) => {
-    user.rating += loserDelta;
-    user.losses += 1;
-    user.totalMatches += 1;
-  });
-
-  await Promise.all([...winnerUsers, ...loserUsers].map((user) => user.save()));
 }
 
 async function runCode(req, res, next) {
@@ -90,7 +84,7 @@ async function runCode(req, res, next) {
       success: true,
       message: "Sample tests executed",
       submissionId: submission._id,
-      result: evaluation,
+      result: publicEvaluation(evaluation, true),
     });
   } catch (error) {
     return next(error);
@@ -106,7 +100,10 @@ async function submitCode(req, res, next) {
     }
 
     const match = await Match.findById(matchId)
-      .populate("problem")
+      .populate({
+        path: "problem",
+        select: "+hiddenTestCases +hiddenTests",
+      })
       .populate("players.user", "username rating coinBalance");
 
     if (!match) {
@@ -119,12 +116,42 @@ async function submitCode(req, res, next) {
       return res.status(403).json({ success: false, message: "You are not a participant in this match" });
     }
 
-    const testCases = [...match.problem.sampleTestCases, ...match.problem.hiddenTestCases];
+    const hiddenTestCases =
+      match.problem.hiddenTestCases?.length
+        ? match.problem.hiddenTestCases
+        : (match.problem.hiddenTests || []);
+
+    const testCases = [...(match.problem.sampleTestCases || []), ...hiddenTestCases];
+
+    if (!testCases.length) {
+      return res.status(400).json({ success: false, message: "Problem has no judge test cases" });
+    }
+
+    const io = req.app.get("io");
+    const sampleCount = match.problem.sampleTestCases?.length || 0;
     const evaluation = await evaluateCode({
       sourceCode: code,
       language,
       testCases,
+      onProgress({ results }) {
+        const hiddenResults = results.slice(sampleCount);
+
+        io.to(match.roomId).emit("submissionProgress", {
+          matchId: match._id.toString(),
+          userId: req.user._id.toString(),
+          username: req.user.username,
+          language,
+          team: match.players[playerIndex].team,
+          passedTests: results.filter((result) => result.passed).length,
+          totalTests: testCases.length,
+          completedTests: results.length,
+          hiddenPassedCount: hiddenResults.filter((result) => result.passed).length,
+          hiddenTotalCount: hiddenTestCases.length,
+          hiddenCompletedCount: hiddenResults.length,
+        });
+      },
     });
+    const hiddenSummary = buildHiddenSummary(evaluation, sampleCount);
 
     const submission = await Submission.create({
       user: req.user._id,
@@ -141,7 +168,34 @@ async function submitCode(req, res, next) {
       status: evaluation.allPassed ? "accepted" : "failed",
     });
 
-    const player = match.players[playerIndex];
+    const freshMatch = await Match.findById(matchId).populate("players.user", "username rating coinBalance");
+
+    if (!freshMatch || !["lobby", "active"].includes(freshMatch.status)) {
+      return res.status(200).json({
+        success: true,
+        message: "Submission evaluated, but the match had already ended.",
+        submissionId: submission._id,
+        result: publicEvaluation(evaluation, false, hiddenSummary),
+        match: freshMatch
+          ? buildMatchSummary(
+              freshMatch,
+              freshMatch.winner ? freshMatch.winner.toString() : null,
+              freshMatch.winnerTeam,
+              {}
+            )
+          : null,
+      });
+    }
+
+    const freshPlayerIndex = freshMatch.players.findIndex(
+      (entry) => entry.user._id.toString() === req.user._id.toString()
+    );
+
+    if (freshPlayerIndex === -1) {
+      return res.status(403).json({ success: false, message: "You are not a participant in this match" });
+    }
+
+    const player = freshMatch.players[freshPlayerIndex];
     player.latestLanguage = language;
     player.hasSubmitted = true;
     player.status = evaluation.allPassed ? "accepted" : "submitted";
@@ -158,14 +212,14 @@ async function submitCode(req, res, next) {
     if (evaluation.allPassed && match.status !== "completed") {
       winnerUserId = req.user._id.toString();
       winnerTeam = player.team;
-      match.status = "completed";
-      match.winner = req.user._id;
-      match.winnerTeam = player.team;
-      match.endedAt = new Date();
+      freshMatch.status = "completed";
+      freshMatch.winner = req.user._id;
+      freshMatch.winnerTeam = player.team;
+      freshMatch.endedAt = new Date();
       submission.isWinnerSubmission = true;
       await submission.save();
 
-      match.players.forEach((entry) => {
+      freshMatch.players.forEach((entry) => {
         if (entry.team === player.team) {
           entry.status = "accepted";
         } else {
@@ -174,15 +228,59 @@ async function submitCode(req, res, next) {
         }
       });
 
-      await updateTeamRatings(match, player.team);
-      rewardSummary = await awardPrizePool(match, player.team);
+      const completion = await Match.updateOne(
+        { _id: freshMatch._id, status: { $in: ["lobby", "active"] } },
+        {
+          $set: {
+            status: "completed",
+            winner: req.user._id,
+            winnerTeam: player.team,
+            endedAt: freshMatch.endedAt,
+            players: freshMatch.players,
+          },
+        }
+      );
+
+      if (!completion.modifiedCount) {
+        const endedMatch = await Match.findById(matchId);
+        return res.status(200).json({
+          success: true,
+          message: "Submission evaluated, but the match had already ended.",
+          submissionId: submission._id,
+          result: publicEvaluation(evaluation, false, hiddenSummary),
+          match: endedMatch
+            ? buildMatchSummary(
+                endedMatch,
+                endedMatch.winner ? endedMatch.winner.toString() : null,
+                endedMatch.winnerTeam,
+                {}
+              )
+            : null,
+        });
+      }
+
+      await applyMatchStatsOnce(freshMatch, player.team);
+      rewardSummary = await awardPrizePool(freshMatch, player.team);
+    } else {
+      await Match.updateOne(
+        { _id: freshMatch._id, status: { $in: ["lobby", "active"] }, "players.user": req.user._id },
+        {
+          $set: {
+            "players.$.latestLanguage": language,
+            "players.$.hasSubmitted": true,
+            "players.$.status": player.status,
+            "players.$.passedTests": evaluation.passedCount,
+            "players.$.totalTests": evaluation.totalCount,
+            "players.$.lastSubmissionAt": player.lastSubmissionAt,
+            "players.$.lastSubmissionId": submission._id,
+            "players.$.isTyping": false,
+          },
+        }
+      );
     }
 
-    await match.save();
-
-    const io = req.app.get("io");
-    io.to(match.roomId).emit("submissionResult", {
-      matchId: match._id.toString(),
+    io.to(freshMatch.roomId).emit("submissionResult", {
+      matchId: freshMatch._id.toString(),
       userId: req.user._id.toString(),
       username: req.user.username,
       language,
@@ -194,16 +292,16 @@ async function submitCode(req, res, next) {
     });
 
     if (winnerUserId) {
-      await clearUsersActiveMatch(match.players.map((entry) => entry.user._id.toString()));
-      io.to(match.roomId).emit("matchEnd", buildMatchSummary(match, winnerUserId, winnerTeam, rewardSummary));
+      await clearUsersActiveMatch(freshMatch.players.map((entry) => entry.user._id.toString()));
+      io.to(freshMatch.roomId).emit("matchEnd", buildMatchSummary(freshMatch, winnerUserId, winnerTeam, rewardSummary));
     }
 
     return res.status(200).json({
       success: true,
       message: evaluation.allPassed ? "Accepted. Your team won the match." : "Submission evaluated",
       submissionId: submission._id,
-      result: evaluation,
-      match: buildMatchSummary(match, winnerUserId, winnerTeam, rewardSummary),
+      result: publicEvaluation(evaluation, false, hiddenSummary),
+      match: buildMatchSummary(freshMatch, winnerUserId, winnerTeam, rewardSummary),
     });
   } catch (error) {
     return next(error);

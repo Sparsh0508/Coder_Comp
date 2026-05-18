@@ -20,6 +20,11 @@ export async function getActiveMatch() {
   return data;
 }
 
+export async function getRecentMatches() {
+  const { data } = await api.get("/match/recent");
+  return data;
+}
+
 export async function timeoutMatch(matchId) {
   const { data } = await api.post(`/match/${matchId}/timeout`);
   return data;

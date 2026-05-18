@@ -3,7 +3,16 @@ import { useEffect, useRef, useState } from "react";
 import { getSocketToken } from "../services/authService";
 import { getSocket } from "../services/socket";
 
-function useMatchSocket({ roomId, onLobbyUpdated, onMatchStarted, onMatchCancelled, onOpponentUpdate, onSubmissionResult, onMatchEnd }) {
+function useMatchSocket({
+  roomId,
+  onLobbyUpdated,
+  onMatchStarted,
+  onMatchCancelled,
+  onOpponentUpdate,
+  onSubmissionProgress,
+  onSubmissionResult,
+  onMatchEnd,
+}) {
   const [connectionMessage, setConnectionMessage] = useState("Connected to live arena.");
   const typingTimeoutRef = useRef(null);
 
@@ -54,6 +63,7 @@ function useMatchSocket({ roomId, onLobbyUpdated, onMatchStarted, onMatchCancell
     socket.on("matchStarted", onMatchStarted);
     socket.on("matchCancelled", onMatchCancelled);
     socket.on("codeUpdate", handleCodeUpdate);
+    socket.on("submissionProgress", onSubmissionProgress);
     socket.on("submissionResult", onSubmissionResult);
     socket.on("matchEnd", onMatchEnd);
 
@@ -64,10 +74,19 @@ function useMatchSocket({ roomId, onLobbyUpdated, onMatchStarted, onMatchCancell
       socket.off("matchStarted", onMatchStarted);
       socket.off("matchCancelled", onMatchCancelled);
       socket.off("codeUpdate", handleCodeUpdate);
+      socket.off("submissionProgress", onSubmissionProgress);
       socket.off("submissionResult", onSubmissionResult);
       socket.off("matchEnd", onMatchEnd);
     };
-  }, [onLobbyUpdated, onMatchStarted, onMatchCancelled, onMatchEnd, onOpponentUpdate, onSubmissionResult]);
+  }, [
+    onLobbyUpdated,
+    onMatchStarted,
+    onMatchCancelled,
+    onMatchEnd,
+    onOpponentUpdate,
+    onSubmissionProgress,
+    onSubmissionResult,
+  ]);
 
   useEffect(() => {
     if (!roomId) {

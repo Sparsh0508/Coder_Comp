@@ -1,18 +1,43 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Activity, Clock, Zap, Target } from "lucide-react";
 import { motion } from "framer-motion";
 
 import StatCard from "../components/StatCard";
 import { useAuth } from "../context/AuthContext";
+import { getRecentMatches } from "../services/matchService";
 
 function DashboardPage() {
   const { user } = useAuth();
-  
-  const matchHistory = [
-    { id: 1, result: "W", opponent: "alex_dev", problem: "Two Sum Data Structure", ratingChange: "+14" },
-    { id: 2, result: "L", opponent: "code_ninja", problem: "Valid Parentheses", ratingChange: "-12" },
-    { id: 3, result: "W", opponent: "frontend_god", problem: "Merge K Sorted", ratingChange: "+22" },
-  ];
+  const [matchHistory, setMatchHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getRecentMatches()
+      .then((response) => {
+        if (isMounted) {
+          setMatchHistory(response.matches || []);
+          setHistoryError("");
+        }
+      })
+      .catch((error) => {
+        if (isMounted) {
+          setHistoryError(error.message || "Unable to load recent battles");
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setHistoryLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <div className="space-y-10">
@@ -84,9 +109,17 @@ function DashboardPage() {
           </Link>
         </div>
         
-        <div className="grid gap-4 md:grid-cols-3">
-          {matchHistory.map((match, i) => {
+        {historyLoading ? (
+          <div className="arena-panel p-6 text-sm font-semibold text-paper-200/60">Loading recent battles...</div>
+        ) : historyError ? (
+          <div className="arena-panel border-flame-500/25 bg-flame-500/10 p-6 text-sm font-semibold text-flame-300">
+            {historyError}
+          </div>
+        ) : matchHistory.length ? (
+          <div className="grid gap-4 md:grid-cols-3">
+            {matchHistory.map((match, i) => {
             const isWin = match.result === "W";
+            const isDraw = match.result === "D";
             return (
               <div 
                 key={match.id} 
@@ -94,11 +127,11 @@ function DashboardPage() {
                 style={{ animationDelay: `${i * 0.1}s` }}
               >
                 <div className="flex items-center justify-between">
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl font-black text-lg ${isWin ? 'bg-arena-500/20 text-arena-400 border border-arena-500/30' : 'bg-flame-500/20 text-flame-400 border border-flame-500/30'}`}>
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl font-black text-lg ${isDraw ? 'bg-paper-200/10 text-paper-200/70 border border-paper-200/20' : isWin ? 'bg-arena-500/20 text-arena-400 border border-arena-500/30' : 'bg-flame-500/20 text-flame-400 border border-flame-500/30'}`}>
                     {match.result}
                   </div>
-                  <div className={`font-mono font-bold ${isWin ? 'text-arena-400' : 'text-flame-400'}`}>
-                    {match.ratingChange}
+                  <div className="font-mono text-xs font-bold uppercase tracking-widest text-paper-200/45">
+                    {match.mode}
                   </div>
                 </div>
                 <div className="mt-4">
@@ -109,8 +142,13 @@ function DashboardPage() {
                 </div>
               </div>
             );
-          })}
-        </div>
+            })}
+          </div>
+        ) : (
+          <div className="arena-panel p-6 text-sm font-semibold text-paper-200/60">
+            No completed battles yet. Your recent results will appear here after your first match.
+          </div>
+        )}
       </motion.section>
     </div>
   );

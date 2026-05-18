@@ -1,3 +1,4 @@
+const Match = require("../models/Match");
 const User = require("../models/User");
 
 async function deductEntryCoins(userIds, entryCoins) {
@@ -46,9 +47,21 @@ async function deductEntryCoins(userIds, entryCoins) {
 }
 
 async function awardPrizePool(match, winningTeam) {
-  if (match.prizeDistributed || !match.prizePool) {
+  if (!match.prizePool) {
     return { rewardedUserIds: [], perWinnerReward: 0, totalPrizePool: match.prizePool || 0 };
   }
+
+  const claimed = await Match.findOneAndUpdate(
+    { _id: match._id, prizeDistributed: { $ne: true } },
+    { $set: { prizeDistributed: true } },
+    { new: true }
+  );
+
+  if (!claimed) {
+    return { rewardedUserIds: [], perWinnerReward: 0, totalPrizePool: match.prizePool || 0 };
+  }
+
+  match.prizeDistributed = true;
 
   const winners = match.players.filter((player) => player.team === winningTeam);
 
@@ -87,8 +100,6 @@ async function awardPrizePool(match, winningTeam) {
     })
   );
 
-  match.prizeDistributed = true;
-
   return {
     rewardedUserIds: winnerUsers.map((user) => user._id.toString()),
     perWinnerReward: baseReward,
@@ -97,7 +108,13 @@ async function awardPrizePool(match, winningTeam) {
 }
 
 async function refundEntryCoins(match) {
-  if (match.prizeDistributed) {
+  const claimed = await Match.findOneAndUpdate(
+    { _id: match._id, prizeDistributed: { $ne: true } },
+    { $set: { prizeDistributed: true } },
+    { new: true }
+  );
+
+  if (!claimed) {
     return { refundedUserIds: [] };
   }
 

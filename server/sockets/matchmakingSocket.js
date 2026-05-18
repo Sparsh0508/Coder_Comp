@@ -1,8 +1,10 @@
 const Match = require("../models/Match");
 const Problem = require("../models/Problem");
 const { awardPrizePool, deductEntryCoins, refundEntryCoins } = require("../utils/matchEconomy");
+const { applyMatchStatsOnce } = require("../utils/matchStats");
 const { logMatch, logWarn } = require("../utils/logger");
 const { clearUsersActiveMatch, setUsersActiveMatch } = require("../utils/userMatchState");
+const { toPublicProblem } = require("../utils/problemPresenter");
 const {
   LOBBY_DURATION_MS,
   MATCH_DURATION_MS,
@@ -141,7 +143,7 @@ function scheduleLobbyStart(io, matchId) {
         roomId: match.roomId,
         matchStartsAt: match.matchStartsAt,
         countdownEndsAt: match.countdownEndsAt,
-        problem: match.problem,
+        problem: toPublicProblem(match.problem),
       });
     } finally {
       lobbyTimers.delete(matchId);
@@ -152,7 +154,7 @@ function scheduleLobbyStart(io, matchId) {
 }
 
 async function createMatch(io, queuedPlayers, mode) {
-  const [problem] = await Problem.aggregate([{ $sample: { size: 1 } }]);
+  const [problem] = await Problem.aggregate([{ $sample: { size: 1 } }, { $project: { _id: 1 } }]);
 
   if (!problem) {
     throw new Error("No problems available for matchmaking");
@@ -469,8 +471,25 @@ function registerMatchmakingHandlers(io) {
         match.winner = winningPlayer.user._id || winningPlayer.user;
       }
 
+      const completion = await Match.updateOne(
+        { _id: match._id, status: "active" },
+        {
+          $set: {
+            status: match.status,
+            winner: match.winner,
+            winnerTeam: match.winnerTeam,
+            endedAt: match.endedAt,
+            players: match.players,
+          },
+        }
+      );
+
+      if (!completion.modifiedCount) {
+        return;
+      }
+
+      await applyMatchStatsOnce(match, winningTeam);
       const rewardSummary = await awardPrizePool(match, winningTeam);
-      await match.save();
       await clearUsersActiveMatch(match.players.map((player) => player.user._id.toString()));
 
       logMatch("Match completed (disconnect)", {

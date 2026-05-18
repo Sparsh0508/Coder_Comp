@@ -134,6 +134,10 @@ const matchSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    statsApplied: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

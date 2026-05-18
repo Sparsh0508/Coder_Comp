@@ -1,5 +1,9 @@
-const bruteForceSolve =
-   require("../../solutions/bruteForce");
+const optimizedSolve =
+   require("../../solutions/optimized");
+
+const {
+   toInputText
+} = require("../../specs/pairMatchingDistanceSpec");
 
 function generateOutputs(
    tests
@@ -8,16 +12,18 @@ function generateOutputs(
    return tests.map(test => {
 
       const output =
-         bruteForceSolve(
+         optimizedSolve(
             test.arr,
             test.minDistance
          );
 
       return {
 
-         input: test,
+         input:
+            toInputText(test),
 
-         output
+         output:
+            String(output)
       };
    });
 }

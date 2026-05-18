@@ -46,6 +46,20 @@ const ProblemSchema =
          default: []
       },
 
+      starterCode: {
+         cpp: String,
+         java: String,
+         python: String
+      },
+
+      sampleTestCases: [
+         {
+            input: String,
+            output: String,
+            explanation: String
+         }
+      ],
+
       difficulty: {
          type: String,
          enum: [
@@ -70,39 +84,53 @@ const ProblemSchema =
             type: Object
          },
 
-         theme: String
+         theme: String,
+
+         family: String
       },
 
       editorial: {
-
-         intuition: String,
-
-         bruteForce: String,
-
-         optimized: String,
-
-         timeComplexity: String,
-
-         spaceComplexity: String,
-
-         edgeCases: [String]
+         type: {
+            intuition: String,
+            bruteForce: String,
+            optimized: String,
+            timeComplexity: String,
+            spaceComplexity: String,
+            edgeCases: [String]
+         },
+         select: false
       },
 
       referenceSolution: {
-
-         code: String,
-
-         language: String,
-
-         complexity: String
+         type: {
+            code: String,
+            language: String,
+            complexity: String
+         },
+         select: false
       },
 
-      hiddenTests: [
-         {
-            input: Object,
-            output: String
-         }
-      ],
+      hiddenTests: {
+         type: [
+            {
+               input: Object,
+               output: String
+            }
+         ],
+         select: false,
+         default: []
+      },
+
+      hiddenTestCases: {
+         type: [
+            {
+               input: String,
+               output: String
+            }
+         ],
+         select: false,
+         default: []
+      },
 
       createdAt: {
          type: Date,

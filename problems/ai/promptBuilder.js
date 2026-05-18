@@ -226,19 +226,9 @@ STRICT MECHANIC REQUIREMENTS
 --------------------------------------------------
 
 The problem MUST use:
-- pair matching logic
-- array/hashmap based thinking
+- the provided pattern directly
+- the listed concepts as the intended solution basis
 - the provided mutation directly
-
-If mutation type is:
-"distance_constraint"
-
-then the problem MUST contain this rule:
-
-|i - j| >= minDistance
-
-where:
-minDistance = ${mutation.minDistance || 1}
 
 The intended solution should primarily use:
 ${concepts.join(", ")}

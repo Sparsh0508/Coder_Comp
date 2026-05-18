@@ -10,7 +10,7 @@ const { judge } = require("./judge/judge");
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || "5mb" }));
 
 //////////////////////////////////////////////////////////
 // 🔥 Get Runner
@@ -205,8 +205,6 @@ app.post("/api/run", async (req, res) => {
 
 app.post("/api/execute", async (req, res) => {
   const { language, code, stdin } = req.body;
-  console.log(language, code, stdin);
-  
 
   const runner = getRunner(language);
   if (!runner) {
@@ -241,7 +239,6 @@ app.post("/api/execute", async (req, res) => {
 
 app.post("/api/submit", async (req, res) => {
   const { language, code } = req.body;
-  console.log(language, code);
   const runner = getRunner(language);
 
   const problem = {
@@ -295,6 +292,17 @@ app.post("/api/submit", async (req, res) => {
 });
 
 //////////////////////////////////////////////////////////
+
+app.use((err, _req, res, next) => {
+  if (err?.type === "entity.too.large") {
+    return res.status(413).json({
+      status: "Payload Too Large",
+      error: `Request body exceeds ${process.env.JSON_BODY_LIMIT || "5mb"}`,
+    });
+  }
+
+  return next(err);
+});
 
 app.listen(5001, () => {
   console.log("🚀 Code Runner running on port 5001");

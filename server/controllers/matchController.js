@@ -5,6 +5,7 @@ const { getEntryCoins } = require("../utils/matchConfig");
 const { refundEntryCoins } = require("../utils/matchEconomy");
 const { forfeitMatchByUser } = require("../utils/matchForfeit");
 const { clearUsersActiveMatch } = require("../utils/userMatchState");
+const { toPublicProblem } = require("../utils/problemPresenter");
 
 function buildMatchEndSummary(match, reason) {
   return {
@@ -67,7 +68,30 @@ function formatMatch(match, userId) {
     currentPlayer: currentPlayer ? formatPlayer(currentPlayer) : null,
     teammates: teammates.map(formatPlayer),
     opponents: opponents.map(formatPlayer),
-    problem: match.problem,
+    problem: toPublicProblem(match.problem),
+  };
+}
+
+function formatRecentMatch(match, userId) {
+  const currentPlayer = match.players.find((player) => player.user._id.toString() === userId);
+  const opponents = currentPlayer
+    ? match.players.filter((player) => player.team !== currentPlayer.team)
+    : [];
+  const result =
+    !match.winnerTeam || !currentPlayer
+      ? "D"
+      : match.winnerTeam === currentPlayer.team
+        ? "W"
+        : "L";
+
+  return {
+    id: match._id,
+    result,
+    mode: match.mode,
+    opponent: opponents.map((player) => player.user.username).join(", ") || "Opponent",
+    problem: match.problem?.title || "Unknown problem",
+    endedAt: match.endedAt || match.updatedAt,
+    prizePool: match.prizePool,
   };
 }
 
@@ -117,6 +141,27 @@ async function findMatch(req, res, next) {
     return res.status(200).json({
       success: true,
       ...queueResult,
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function getRecentMatches(req, res, next) {
+  try {
+    const userId = req.user._id.toString();
+    const matches = await Match.find({
+      "players.user": req.user._id,
+      status: "completed",
+    })
+      .sort({ endedAt: -1, updatedAt: -1 })
+      .limit(6)
+      .populate("problem", "title difficulty")
+      .populate("players.user", "username rating");
+
+    return res.status(200).json({
+      success: true,
+      matches: matches.map((match) => formatRecentMatch(match, userId)),
     });
   } catch (error) {
     return next(error);
@@ -267,6 +312,7 @@ async function forfeitMatch(req, res, next) {
 
 module.exports = {
   findMatch,
+  getRecentMatches,
   leaveQueue,
   getMatch,
   getActiveMatch,
