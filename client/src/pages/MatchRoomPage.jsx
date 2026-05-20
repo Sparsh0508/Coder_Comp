@@ -371,7 +371,7 @@ function MatchRoomPage() {
         </div>
       ) : null}
 
-      <div className="grid h-full gap-4 xl:grid-cols-[0.92fr_1.08fr]">
+      <div className="grid h-full gap-4 xl:grid-cols-[0.8fr_1.2fr]">
         <div className="min-h-0">
           <ProblemPanel problem={match.problem} />
         </div>

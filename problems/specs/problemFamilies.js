@@ -15,23 +15,33 @@ function constraintsFor(difficulty, family) {
 
    const table = {
       pair_equal_distance: {
-         easy: { n: 1000, expectedComplexity: "O(n^2)" },
-         medium: { n: 100000, expectedComplexity: "O(n)" },
-         hard: { n: 200000, expectedComplexity: "O(n)" }
+         easy: { minN: 500, maxN: 2000, expectedComplexity: "O(n^2)" },
+         medium: { minN: 50000, maxN: 120000, expectedComplexity: "O(n)" },
+         hard: { minN: 150000, maxN: 300000, expectedComplexity: "O(n)" }
       },
       pair_sum_count: {
-         easy: { n: 2000, expectedComplexity: "O(n^2)" },
-         medium: { n: 200000, expectedComplexity: "O(n)" },
-         hard: { n: 300000, expectedComplexity: "O(n)" }
+         easy: { minN: 800, maxN: 3000, expectedComplexity: "O(n^2)" },
+         medium: { minN: 80000, maxN: 220000, expectedComplexity: "O(n)" },
+         hard: { minN: 180000, maxN: 350000, expectedComplexity: "O(n)" }
       },
       prefix_sum_subarray_count: {
-         easy: { n: 2000, expectedComplexity: "O(n^2)" },
-         medium: { n: 200000, expectedComplexity: "O(n)" },
-         hard: { n: 300000, expectedComplexity: "O(n)" }
+         easy: { minN: 800, maxN: 3000, expectedComplexity: "O(n^2)" },
+         medium: { minN: 80000, maxN: 220000, expectedComplexity: "O(n)" },
+         hard: { minN: 180000, maxN: 350000, expectedComplexity: "O(n)" }
       }
    };
 
-   return table[family][normalized] || table[family].easy;
+   const selected =
+      table[family][normalized] || table[family].easy;
+
+   const valueLimits =
+      [1000, 100000, 1000000000];
+
+   return {
+      n: randomInt(selected.minN, selected.maxN),
+      valueLimit: valueLimits[randomInt(0, valueLimits.length - 1)],
+      expectedComplexity: selected.expectedComplexity
+   };
 }
 
 function toArrayInput(input) {
@@ -262,8 +272,8 @@ const families = [
             outputFormat: "Print one integer: the number of valid target-sum pairs.",
             constraints: [
                `2 <= n <= ${structure.constraints.n}`,
-               "-10^9 <= arr[i] <= 10^9",
-               "-10^9 <= target <= 10^9",
+               `-${structure.constraints.valueLimit} <= arr[i] <= ${structure.constraints.valueLimit}`,
+               `-${structure.constraints.valueLimit} <= target <= ${structure.constraints.valueLimit}`,
                "Count pairs by index, not by distinct value."
             ],
             tags: Array.from(new Set([...(aiProblem.tags || []), "array", "hashmap", "pair-counting"])),
@@ -353,8 +363,8 @@ int main() {
             outputFormat: "Print one integer: the number of contiguous subarrays with sum equal to target.",
             constraints: [
                `1 <= n <= ${structure.constraints.n}`,
-               "-10^9 <= arr[i] <= 10^9",
-               "-10^9 <= target <= 10^9",
+               `-${structure.constraints.valueLimit} <= arr[i] <= ${structure.constraints.valueLimit}`,
+               `-${structure.constraints.valueLimit} <= target <= ${structure.constraints.valueLimit}`,
                "The answer may be larger than n, so use a 64-bit integer."
             ],
             tags: Array.from(new Set([...(aiProblem.tags || []), "array", "hashmap", "prefix-sum"])),

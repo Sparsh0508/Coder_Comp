@@ -20,6 +20,9 @@ function toPublicProblem(problem) {
     difficulty: source.difficulty,
     starterCode: source.starterCode || {},
     sampleTestCases: source.sampleTestCases || [],
+    family: source.structure?.family,
+    pattern: source.structure?.pattern,
+    mutation: source.structure?.mutation,
     structure: source.structure,
     createdAt: source.createdAt,
   };

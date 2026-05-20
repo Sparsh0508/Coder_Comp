@@ -137,6 +137,8 @@ int main() {
 function normalizeAiProblem(aiProblem, structure) {
    const minDistance = structure.mutation.minDistance;
    const maxN = structure.constraints.n;
+   const valueLimit =
+      structure.constraints.valueLimit || 1000000000;
 
    return {
       ...aiProblem,
@@ -149,7 +151,7 @@ function normalizeAiProblem(aiProblem, structure) {
       constraints: [
          `2 <= n <= ${maxN}`,
          "1 <= minDistance <= n",
-         "-10^9 <= arr[i] <= 10^9",
+         `-${valueLimit} <= arr[i] <= ${valueLimit}`,
          `For generated tests, minDistance is ${minDistance}`,
          "A pair (i, j) is valid only when i < j, arr[i] = arr[j], and j - i >= minDistance"
       ],
