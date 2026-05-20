@@ -304,6 +304,8 @@ app.use((err, _req, res, next) => {
   return next(err);
 });
 
-app.listen(5001, () => {
-  console.log("🚀 Code Runner running on port 5001");
+const PORT = process.env.PORT || 10000;
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Code Runner running on port ${PORT}`);
 });
