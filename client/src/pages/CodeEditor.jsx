@@ -140,7 +140,8 @@ const { user } = useAuth();
     setActiveTab("result");
 
     try {
-      const res = await fetch("http://localhost:5001/api/run", {
+      const runnerUrl = import.meta.env.VITE_RUNNER_URL || "http://localhost:5001";
+      const res = await fetch(`${runnerUrl}/api/run`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -175,7 +176,8 @@ const { user } = useAuth();
     setActiveTab("result");
 
     try {
-      const res = await fetch("http://localhost:5001/api/submit", {
+      const runnerUrl = import.meta.env.VITE_RUNNER_URL || "http://localhost:5001";
+      const res = await fetch(`${runnerUrl}/api/submit`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

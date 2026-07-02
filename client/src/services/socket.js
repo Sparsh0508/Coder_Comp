@@ -4,7 +4,7 @@ let socket;
 
 export function getSocket() {
   if (!socket) {
-    socket = io(import.meta.env.VITE_SOCKET_URL || "http://localhost:8080", {
+    socket = io(import.meta.env.VITE_SOCKET_URL || "https://coder-comp-server.onrender.com", {
       withCredentials: true,
       autoConnect: false,
       reconnection: false,
