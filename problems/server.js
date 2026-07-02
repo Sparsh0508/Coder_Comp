@@ -1,16 +1,11 @@
 const path = require("path");
 const dotenv = require("dotenv");
-
-dotenv.config({
-   path: path.resolve(__dirname, ".env")
-});
-
-dotenv.config({
-   path: path.resolve(__dirname, "../server/.env")
-});
-
+// const dns = "node:dns/promises";
+const dns = require("dns/promises");
+dns.setServers(["1.1.1.1", "1.0.0.1"]); 
+dotenv.config();
 const app = require("./app");
-const connectDb = require("../server/utils/connectDb");
+const connectDb = require("./connectDb");
 
 const PORT = process.env.PROBLEMS_PORT || 5000;
 

@@ -28,6 +28,11 @@ function constraintsFor(difficulty, family) {
          easy: { minN: 800, maxN: 3000, expectedComplexity: "O(n^2)" },
          medium: { minN: 80000, maxN: 220000, expectedComplexity: "O(n)" },
          hard: { minN: 180000, maxN: 350000, expectedComplexity: "O(n)" }
+      },
+      sliding_window_max_sum: {
+         easy: { minN: 800, maxN: 3000, expectedComplexity: "O(n^2)" },
+         medium: { minN: 80000, maxN: 220000, expectedComplexity: "O(n)" },
+         hard: { minN: 180000, maxN: 350000, expectedComplexity: "O(n)" }
       }
    };
 
@@ -75,6 +80,23 @@ function solveSubarraySum(input) {
    }
 
    return String(count);
+}
+
+function solveFixedWindowMaxSum(input) {
+   let current = 0;
+
+   for(let index = 0; index < input.k; index++) {
+      current += input.arr[index];
+   }
+
+   let best = current;
+
+   for(let index = input.k; index < input.n; index++) {
+      current += input.arr[index] - input.arr[index - input.k];
+      best = Math.max(best, current);
+   }
+
+   return String(best);
 }
 
 function makeTextCase(input, solver, explanation) {
@@ -145,6 +167,35 @@ function buildSubarrayTests(structure) {
          n,
          target: randomInt(-10, 10),
          arr
+      });
+   }
+
+   return tests;
+}
+
+function buildSlidingWindowTests(structure) {
+   const maxN =
+      Math.min(structure.constraints.n, 120000);
+
+   const tests = [
+      { n: 6, k: 3, arr: [2, 1, 5, 1, 3, 2] },
+      { n: 5, k: 2, arr: [-5, -2, -8, -1, -4] },
+      { n: 4, k: 4, arr: [10, -3, 2, 7] },
+      { n: 7, k: 1, arr: [4, -1, 9, 3, 2, 8, 0] }
+   ];
+
+   tests.push({
+      n: maxN,
+      k: Math.max(1, Math.floor(maxN / 3)),
+      arr: Array.from({ length: maxN }, (_, index) => index % 5 === 0 ? 50 : -3)
+   });
+
+   for(let i = 0; i < 20; i++) {
+      const n = randomInt(8, 50);
+      tests.push({
+         n,
+         k: randomInt(1, n),
+         arr: Array.from({ length: n }, () => randomInt(-100, 100))
       });
    }
 
@@ -431,6 +482,150 @@ int main() {
             edgeCases: ["All zeros", "Negative values", "No matching subarray", "Large answer requiring 64-bit integer"]
          };
       }
+   },
+   {
+      id: "sliding_window_max_sum",
+      pattern: "sliding-window",
+      aliases: ["sliding_window", "slidingwindow", "fixed_window", "fixed-window"],
+      label: "Sliding Window Max Sum",
+      createStructure({ difficulty, theme }) {
+         return {
+            pattern: "sliding-window",
+            concepts: ["array", "sliding-window"],
+            mutation: {
+               type: "fixed_window_sum",
+               windowRange: [1, "n"]
+            },
+            constraints: constraintsFor(difficulty, "sliding_window_max_sum"),
+            theme,
+            family: this.id
+         };
+      },
+      normalizeProblem(aiProblem, structure) {
+         return {
+            ...aiProblem,
+            title: aiProblem.title || "Fixed Window Treasure",
+            description: "Given an array of integers and a window size k, find the maximum possible sum of any contiguous subarray containing exactly k elements.",
+            inputFormat: "The first line contains n and k. The second line contains n integers.",
+            outputFormat: "Print one integer: the maximum sum of a contiguous window of length k.",
+            constraints: [
+               `1 <= k <= n <= ${structure.constraints.n}`,
+               `-${structure.constraints.valueLimit} <= arr[i] <= ${structure.constraints.valueLimit}`,
+               "Use a 64-bit integer for window sums.",
+               "The window must contain exactly k contiguous elements."
+            ],
+            tags: Array.from(new Set([...(aiProblem.tags || []), "array", "sliding-window"])),
+            explanation: "Keep the sum of the current k-length window. Slide the window one index at a time by adding the new element and removing the element that left."
+         };
+      },
+      buildSamples() {
+         return [
+            {
+               input: "6 3\n2 1 5 1 3 2\n",
+               output: solveFixedWindowMaxSum({ n: 6, k: 3, arr: [2, 1, 5, 1, 3, 2] }),
+               explanation: "The best length-3 window is [5, 1, 3] with sum 9."
+            },
+            {
+               input: "5 2\n-5 -2 -8 -1 -4\n",
+               output: solveFixedWindowMaxSum({ n: 5, k: 2, arr: [-5, -2, -8, -1, -4] }),
+               explanation: "The maximum sum can still be negative; the best window is [-1, -4]."
+            }
+         ];
+      },
+      buildHiddenTests: buildSlidingWindowTests,
+      generateOutputs(tests) {
+         return tests.map((test) => ({
+            input: [
+               `${test.n} ${test.k}`,
+               test.arr.join(" ")
+            ].join("\n") + "\n",
+            output: solveFixedWindowMaxSum(test)
+         }));
+      },
+      buildStarterCode() {
+         return {
+            cpp: `#include <bits/stdc++.h>
+using namespace std;
+
+int main() {
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+
+    int n, k;
+    cin >> n >> k;
+    vector<long long> arr(n);
+    for (int i = 0; i < n; i++) cin >> arr[i];
+
+    // Print the maximum sum among all windows of length k.
+    return 0;
+}
+`,
+            java: `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        int n = sc.nextInt();
+        int k = sc.nextInt();
+        long[] arr = new long[n];
+        for (int i = 0; i < n; i++) arr[i] = sc.nextLong();
+
+        // Print the maximum sum among all windows of length k.
+    }
+}
+`,
+            python: `def main():
+    n, k = map(int, input().split())
+    arr = list(map(int, input().split()))
+
+    # Print the maximum sum among all windows of length k.
+
+if __name__ == "__main__":
+    main()
+`
+         };
+      },
+      buildReferenceSolution() {
+         return {
+            language: "cpp",
+            complexity: "O(n)",
+            code: `#include <bits/stdc++.h>
+using namespace std;
+
+int main() {
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+
+    int n, k;
+    cin >> n >> k;
+    vector<long long> arr(n);
+    for (int i = 0; i < n; i++) cin >> arr[i];
+
+    long long current = 0;
+    for (int i = 0; i < k; i++) current += arr[i];
+
+    long long best = current;
+    for (int i = k; i < n; i++) {
+        current += arr[i] - arr[i - k];
+        best = max(best, current);
+    }
+
+    cout << best << '\\n';
+    return 0;
+}
+`
+         };
+      },
+      buildFallbackEditorial() {
+         return {
+            intuition: "Adjacent fixed-size windows share almost all elements, so recomputing every sum from scratch wastes work.",
+            bruteForce: "For each start index, sum the next k elements and keep the maximum.",
+            optimized: "Compute the first window sum once, then slide by adding the entering value and subtracting the leaving value.",
+            timeComplexity: "O(n)",
+            spaceComplexity: "O(1)",
+            edgeCases: ["k = 1", "k = n", "All values negative", "Multiple windows with the same maximum sum"]
+         };
+      }
    }
 ];
 
@@ -439,8 +634,20 @@ function selectProblemFamily(requestedFamily) {
       const normalized =
          String(requestedFamily).toLowerCase();
 
+      const normalizedAlias =
+         normalized.replace(/-/g, "_");
+
       const family =
-      families.find((entry) => entry.id === normalized || entry.pattern === normalized);
+      families.find((entry) => {
+         const aliases = entry.aliases || [];
+
+         return entry.id === normalized ||
+            entry.id === normalizedAlias ||
+            entry.pattern === normalized ||
+            entry.pattern === normalizedAlias ||
+            aliases.includes(normalized) ||
+            aliases.includes(normalizedAlias);
+      });
 
       if(!family) {
          throw new Error(`Unsupported problem family: ${requestedFamily}`);
