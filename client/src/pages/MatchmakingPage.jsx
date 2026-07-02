@@ -13,6 +13,50 @@ const entryCoinsByMode = {
   "4v4": 100,
 };
 
+function waitForSocketConnection(socket) {
+  if (socket.connected && socket.id) {
+    return Promise.resolve(socket);
+  }
+
+  return new Promise((resolve, reject) => {
+    let timeoutId;
+
+    function cleanup() {
+      window.clearTimeout(timeoutId);
+      socket.off("connect", handleConnect);
+      socket.off("connect_error", handleConnectError);
+    }
+
+    function handleConnect() {
+      cleanup();
+
+      if (!socket.id) {
+        reject(new Error("Realtime connection did not return a socket id"));
+        return;
+      }
+
+      resolve(socket);
+    }
+
+    function handleConnectError(error) {
+      cleanup();
+      reject(new Error(error?.message || "Realtime connection failed"));
+    }
+
+    timeoutId = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("Unable to establish realtime connection"));
+    }, 5000);
+
+    socket.once("connect", handleConnect);
+    socket.once("connect_error", handleConnectError);
+
+    if (!socket.connected) {
+      socket.connect();
+    }
+  });
+}
+
 function MatchmakingPage() {
   const navigate = useNavigate();
   const { user, refreshUser } = useAuth();
@@ -132,7 +176,7 @@ function MatchmakingPage() {
     async function ensureConnected() {
       let socket = getSocket();
 
-      if (socket.connected) {
+      if (socket.connected && socket.id) {
         return socket;
       }
 
@@ -144,21 +188,8 @@ function MatchmakingPage() {
         throw new Error(error.message || "Unable to authenticate realtime connection");
       }
 
-      socket.connect();
-
       try {
-        await new Promise((resolve, reject) => {
-          const timeoutId = window.setTimeout(() => reject(new Error("Unable to establish realtime connection")), 5000);
-          socket.once("connect", () => {
-            window.clearTimeout(timeoutId);
-            resolve();
-          });
-          socket.once("connect_error", (error) => {
-            window.clearTimeout(timeoutId);
-            reject(new Error(error?.message || "Realtime connection failed"));
-          });
-        });
-        return socket;
+        return await waitForSocketConnection(socket);
       } catch (error) {
         if (String(error?.message || "").toLowerCase().includes("authentication")) {
           // Token may have expired mid-match; create a fresh socket and retry once.
@@ -167,36 +198,28 @@ function MatchmakingPage() {
           const response = await getSocketToken();
           socket.auth = { token: response.token };
           socket.io.opts.query = { token: response.token };
-          socket.connect();
-          await new Promise((resolve, reject) => {
-            const timeoutId = window.setTimeout(() => reject(new Error("Unable to establish realtime connection")), 5000);
-            socket.once("connect", () => {
-              window.clearTimeout(timeoutId);
-              resolve();
-            });
-            socket.once("connect_error", (connectError) => {
-              window.clearTimeout(timeoutId);
-              reject(new Error(connectError?.message || "Realtime connection failed"));
-            });
-          });
-          return socket;
+          return await waitForSocketConnection(socket);
         }
 
         throw error;
       }
     }
 
-    const socket = await ensureConnected();
-
-    setQueueState((current) => ({
-      ...current,
-      searching: true,
-      mode: selectedMode,
-      requiredPlayers: selectedMode === "1v1" ? 2 : selectedMode === "2v2" ? 4 : 8,
-      message: `Requesting a ${selectedMode} match...`,
-    }));
-
     try {
+      const socket = await ensureConnected();
+
+      if (!socket.id) {
+        throw new Error("Realtime connection did not return a socket id. Please try again.");
+      }
+
+      setQueueState((current) => ({
+        ...current,
+        searching: true,
+        mode: selectedMode,
+        requiredPlayers: selectedMode === "1v1" ? 2 : selectedMode === "2v2" ? 4 : 8,
+        message: `Requesting a ${selectedMode} match...`,
+      }));
+
       const response = await findMatch({ socketId: socket.id, mode: selectedMode });
       setQueueState((current) => ({
         ...current,
@@ -213,6 +236,13 @@ function MatchmakingPage() {
         const current = await getActiveMatch().catch(() => ({ activeMatch: null }));
         setActiveMatch(current.activeMatch);
       }
+
+      console.warn("Find match failed", {
+        status: error.status,
+        message: error.message,
+        details: error.data,
+      });
+
       setQueueState((current) => ({
         ...current,
         searching: false,
