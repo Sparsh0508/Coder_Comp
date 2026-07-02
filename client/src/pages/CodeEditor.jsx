@@ -176,7 +176,7 @@ const { user } = useAuth();
     setActiveTab("result");
 
     try {
-      const runnerUrl = import.meta.env.VITE_RUNNER_URL || "http://localhost:5001";
+      const runnerUrl = import.meta.env.VITE_RUNNER_URL || "https://coder-comp-server.onrender.com";
       const res = await fetch(`${runnerUrl}/api/submit`, {
         method: "POST",
         headers: {
