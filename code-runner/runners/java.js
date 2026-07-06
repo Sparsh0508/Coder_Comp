@@ -8,84 +8,132 @@ async function runJava(code, input = "") {
     const id = uuid();
     const dir = path.join(__dirname, "temp", id);
 
-    // ✅ Create temp directory
     fs.mkdirSync(dir, { recursive: true });
 
-    const filePath = path.join(dir, "Main.java");
-    fs.writeFileSync(filePath, code);
+    const javaFile = path.join(dir, "Main.java");
+    fs.writeFileSync(javaFile, code);
 
-    const dockerCommand = [
-      "run",
-      "-i",
-      "--rm",
-      "--memory=200m",
-      "--cpus=0.5",
-      "--network=none",
-      "--pids-limit=50",
-      "-v",
-      `${dir}:/app`,
-      "eclipse-temurin:17",
-      "sh",
-      "-c",
-      "javac /app/Main.java && java -cp /app Main"
-    ];
-
-    const run = spawn("docker", dockerCommand);
-
-    let stdout = "";
-    let stderr = "";
-
-    if (input) {
-      let normalizedInput = input.trim();
-
-      if (!normalizedInput.includes("\n")) {
-        normalizedInput = normalizedInput.split(/\s+/).join("\n");
-      }
-
-      normalizedInput += "\n";
-      run.stdin.write(normalizedInput);
-    }
-
-    run.stdin.end();
-
-    run.stdout.on("data", (data) => {
-      stdout += data.toString();
-    });
-
-    run.stderr.on("data", (data) => {
-      stderr += data.toString();
-    });
+    let finished = false;
 
     const cleanup = () => {
       try {
         fs.rmSync(dir, { recursive: true, force: true });
-      } catch (e) {}
+      } catch {}
     };
 
-    // ⏱️ Timeout protection (TLE)
-    const timeout = setTimeout(() => {
-      run.kill("SIGKILL");
-      cleanup();
-      resolve({
-        status: "TLE",
-        output: ""
-      });
-    }, 5000);
+    // -------------------------
+    // Compile Java
+    // -------------------------
+    const compile = spawn("javac", ["Main.java"], {
+      cwd: dir,
+    });
 
-    run.on("close", (code) => {
-      clearTimeout(timeout);
+    let compileError = "";
+
+    compile.stderr.on("data", (data) => {
+      compileError += data.toString();
+    });
+
+    compile.on("error", (err) => {
+      if (finished) return;
+      finished = true;
       cleanup();
+
+      resolve({
+        status: "Internal Error",
+        output: err.message,
+      });
+    });
+
+    compile.on("close", (code) => {
+      if (finished) return;
 
       if (code !== 0) {
+        finished = true;
+        cleanup();
+
         return resolve({
-          status: "Error",
-          output: stderr
+          status: "Compilation Error",
+          output: compileError,
         });
       }
 
-      resolve({
-        status: "Success",
-        output: stdout.trim()
+      // -------------------------
+      // Run Java Program
+      // -------------------------
+      const run = spawn("java", ["-cp", dir, "Main"]);
+
+      let stdout = "";
+      let stderr = "";
+
+      if (input) {
+        let normalizedInput = input.trim();
+
+        if (!normalizedInput.includes("\n")) {
+          normalizedInput = normalizedInput
+            .split(/\s+/)
+            .join("\n");
+        }
+
+        normalizedInput += "\n";
+
+        run.stdin.write(normalizedInput);
+      }
+
+      run.stdin.end();
+
+      const timeout = setTimeout(() => {
+        if (finished) return;
+
+        finished = true;
+        run.kill("SIGKILL");
+        cleanup();
+
+        resolve({
+          status: "Time Limit Exceeded",
+          output: "",
+        });
+      }, 5000);
+
+      run.stdout.on("data", (data) => {
+        stdout += data.toString();
+      });
+
+      run.stderr.on("data", (data) => {
+        stderr += data.toString();
+      });
+
+      run.on("error", (err) => {
+        if (finished) return;
+
+        finished = true;
+        clearTimeout(timeout);
+        cleanup();
+
+        resolve({
+          status: "Runtime Error",
+          output: err.message,
+        });
+      });
+
+      run.on("close", (exitCode) => {
+        if (finished) return;
+
+        finished = true;
+        clearTimeout(timeout);
+        cleanup();
+
+        if (exitCode !== 0) {
+          return resolve({
+            status: "Runtime Error",
+            output: stderr,
+          });
+        }
+
+        resolve({
+          status: "Success",
+          output: stdout.trim(),
+        });
       });
     });
   });

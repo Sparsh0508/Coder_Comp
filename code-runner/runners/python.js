@@ -3,7 +3,7 @@ const path = require("path");
 const { spawn } = require("child_process");
 const { v4: uuid } = require("uuid");
 
-async function runPython(code, input) {
+async function runPython(code, input = "") {
   return new Promise((resolve) => {
     let finished = false;
 
@@ -16,122 +16,106 @@ async function runPython(code, input) {
     const filePath = path.join(dir, "main.py");
     fs.writeFileSync(filePath, code);
 
-    // ✅ Fix Windows path issue
-    const dockerPath = dir.replace(/\\/g, "/");
-
-    const dockerCommand = [
-      "run",
-      "--rm",
-      "-i",
-      "--init",
-      "--memory=100m",
-      "--cpus=0.5",
-      "--network=none",
-      "--pids-limit=50",
-      "-v",
-      `${dockerPath}:/app`,
-      "-w",
-      "/app",
-      "python:3.10",
-      "python",
-      "-u",
-      "main.py"
-    ];
-
-    const run = spawn("docker", dockerCommand, {
-      stdio: ["pipe", "pipe", "pipe"]
+    const run = spawn("python3", ["-u", filePath], {
+      stdio: ["pipe", "pipe", "pipe"],
     });
 
     let stdout = "";
     let stderr = "";
 
-    // Give the container enough time to start on local Docker, especially on first runs.
-    const timeout = setTimeout(() => {
-      if (!finished) {
-        finished = true;
-        run.kill("SIGKILL");
-        cleanup();
-        return resolve({ status: "Time Limit Exceeded" });
-      }
-    }, 10000); 
+    const cleanup = () => {
+      try {
+        fs.rmSync(dir, { recursive: true, force: true });
+      } catch {}
+    };
 
-    // ✅ Input handling
+    // Timeout
+    const timeout = setTimeout(() => {
+      if (finished) return;
+
+      finished = true;
+      run.kill("SIGKILL");
+      cleanup();
+
+      resolve({
+        status: "Time Limit Exceeded",
+        output: "",
+      });
+    }, 10000);
+
+    // Input
     if (input) {
       if (input.length > 5000) {
+        clearTimeout(timeout);
         cleanup();
-        return resolve({ status: "Input Too Large" });
+
+        return resolve({
+          status: "Input Too Large",
+          output: "",
+        });
       }
 
       let normalizedInput = input.trim();
 
       if (!normalizedInput.includes("\n")) {
-        normalizedInput = normalizedInput.split(/\s+/).join("\n");
+        normalizedInput = normalizedInput
+          .split(/\s+/)
+          .join("\n");
       }
 
       normalizedInput += "\n";
 
       run.stdin.write(normalizedInput);
-      run.stdin.end();
-    } else {
-      run.stdin.end();
     }
 
-    // 📤 Capture stdout (with limit)
+    run.stdin.end();
+
+    // stdout
     run.stdout.on("data", (data) => {
+      stdout += data.toString();
+
       if (stdout.length > 10000) {
         run.kill("SIGKILL");
-        stdout = "Output Limit Exceeded";
-        return;
       }
-      stdout += data.toString();
     });
 
-    // ⚠️ Capture stderr
+    // stderr
     run.stderr.on("data", (data) => {
       stderr += data.toString();
     });
 
-    // ✅ Process finished
+    run.on("error", (err) => {
+      if (finished) return;
+
+      finished = true;
+      clearTimeout(timeout);
+      cleanup();
+
+      resolve({
+        status: "Internal Error",
+        output: err.message,
+      });
+    });
+
     run.on("close", (code) => {
       if (finished) return;
-      finished = true;
 
+      finished = true;
       clearTimeout(timeout);
       cleanup();
 
       if (code !== 0) {
         return resolve({
           status: "Runtime Error",
-          error: stderr || "Non-zero exit code"
+          output: stderr || "Non-zero exit code",
         });
       }
 
-      return resolve({
+      resolve({
         status: "Success",
-        output: stdout.trim()
+        output: stdout.trim(),
       });
     });
-
-    // ❌ Spawn error
-    run.on("error", (err) => {
-      if (finished) return;
-      finished = true;
-
-      clearTimeout(timeout);
-      cleanup();
-
-      return resolve({
-        status: "Internal Error",
-        error: err.message
-      });
-    });
-
-    // 🧹 Cleanup
-    function cleanup() {
-      try {
-        fs.rmSync(dir, { recursive: true, force: true });
-      } catch {}
-    }
   });
 }
 

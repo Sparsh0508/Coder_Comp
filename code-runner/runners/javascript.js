@@ -3,7 +3,7 @@ const path = require("path");
 const { spawn } = require("child_process");
 const { v4: uuid } = require("uuid");
 
-async function runJS(code, input) {
+async function runJS(code, input = "") {
   return new Promise((resolve) => {
     let finished = false;
 
@@ -16,59 +16,48 @@ async function runJS(code, input) {
     const filePath = path.join(dir, "main.js");
     fs.writeFileSync(filePath, code);
 
-    // ✅ Fix Windows path issue
-    const dockerPath = dir.replace(/\\/g, "/");
-
-    const dockerCommand = [
-      "run",
-      "--rm",
-      "-i",
-      "--init",
-      "--memory=100m",
-      "--cpus=0.5",
-      "--network=none",
-      "--pids-limit=50",
-      "-v",
-      `${dockerPath}:/app`,
-      "-w",
-      "/app",
-      "node:18-alpine",
-      "node",
-      "main.js"
-    ];
-
-    const run = spawn("docker", dockerCommand, {
-      stdio: ["pipe", "pipe", "pipe"]
+    // Run directly using Node
+    const run = spawn("node", [filePath], {
+      stdio: ["pipe", "pipe", "pipe"],
     });
 
     let stdout = "";
     let stderr = "";
 
-    // ⏱ Timeout (3 sec)
-    const timeout = setTimeout(() => {
-      if (!finished) {
-        finished = true;
-        run.kill("SIGKILL");
-        cleanup();
-        return resolve({ status: "Time Limit Exceeded" });
-      }
-    }, 3000); 
+    const cleanup = () => {
+      try {
+        fs.rmSync(dir, { recursive: true, force: true });
+      } catch {}
+    };
 
-    // ✅ Input handling
+    // Timeout (3 seconds)
+    const timeout = setTimeout(() => {
+      if (finished) return;
+
+      finished = true;
+      run.kill("SIGKILL");
+      cleanup();
+
+      resolve({
+        status: "Time Limit Exceeded",
+        output: "",
+      });
+    }, 3000);
+
+    // Send stdin
     if (input) {
       run.stdin.write(input);
-      run.stdin.end();
-    } else {
-      run.stdin.end();
     }
+    run.stdin.end();
 
     // Capture stdout
     run.stdout.on("data", (data) => {
+      stdout += data.toString();
+
+      // Prevent huge outputs
       if (stdout.length > 10000) {
         run.kill("SIGKILL");
-        return;
       }
-      stdout += data.toString();
     });
 
     // Capture stderr
@@ -76,33 +65,38 @@ async function runJS(code, input) {
       stderr += data.toString();
     });
 
-    // Process finished
+    run.on("error", (err) => {
+      if (finished) return;
+
+      finished = true;
+      clearTimeout(timeout);
+      cleanup();
+
+      resolve({
+        status: "Internal Error",
+        output: err.message,
+      });
+    });
+
     run.on("close", (code) => {
       if (finished) return;
-      finished = true;
 
+      finished = true;
       clearTimeout(timeout);
       cleanup();
 
       if (code !== 0) {
         return resolve({
           status: "Runtime Error",
-          output: stderr || stdout || "Non-zero exit code"
+          output: stderr || stdout || "Non-zero exit code",
         });
       }
 
-      return resolve({
+      resolve({
         status: "Success",
-        output: stdout.trim() || stderr.trim()
+        output: stdout.trim(),
       });
     });
-
-    // Cleanup
-    function cleanup() {
-      try {
-        fs.rmSync(dir, { recursive: true, force: true });
-      } catch {}
-    }
   });
 }
 
