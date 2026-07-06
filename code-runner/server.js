@@ -146,7 +146,8 @@ console.log(solve(nums, target));
 
 app.post("/api/run", async (req, res) => {
   const { language, code, input, inputs } = req.body;
-
+   console.log("===== RUN REQUEST =====");
+  console.log(req.body);
   const runner = getRunner(language);
   if (!runner) {
     return res.status(400).json({ error: "Unsupported language" });
@@ -208,6 +209,8 @@ app.post("/api/run", async (req, res) => {
 
 app.post("/api/execute", async (req, res) => {
   const { language, code, stdin } = req.body;
+   console.log("===== EXECUTE REQUEST =====");
+  console.log(req.body);
 
   const runner = getRunner(language);
   if (!runner) {
@@ -242,6 +245,8 @@ app.post("/api/execute", async (req, res) => {
 
 app.post("/api/submit", async (req, res) => {
   const { language, code } = req.body;
+   console.log("===== SUBMIT REQUEST =====");
+  console.log(req.body);
   const runner = getRunner(language);
 
   const problem = {
