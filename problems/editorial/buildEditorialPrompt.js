@@ -43,13 +43,18 @@ Generate a clean editorial containing:
 Return ONLY valid JSON in this format:
 
 {
-  "intuition": "",
-  "bruteForce": "",
-  "optimized": "",
-  "timeComplexity": "",
-  "spaceComplexity": "",
-  "edgeCases": []
+  "intuition": "detailed intuition...",
+  "bruteForce": "detailed brute force approach...",
+  "optimized": "detailed optimized approach...",
+  "timeComplexity": "e.g., O(N)",
+  "spaceComplexity": "e.g., O(1)",
+  "edgeCases": [
+    "Description of edge case 1",
+    "Description of edge case 2"
+  ]
 }
+
+CRITICAL: The "edgeCases" field must be a flat array of strings. Do NOT output objects (like {"name": "...", "description": "..."}) or nested JSON strings inside this array.
 `;
 }
 

@@ -1,3 +1,6 @@
+const mongoose = require("mongoose");
+global.commonMongoose = mongoose;
+
 const path = require("path");
 const dotenv = require("dotenv");
 // const dns = "node:dns/promises";

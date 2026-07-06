@@ -1,5 +1,5 @@
 const mongoose =
-   require("mongoose");
+   global.commonMongoose || require("mongoose");
 
 const ProblemSchema =
    new mongoose.Schema({
