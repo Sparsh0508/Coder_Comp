@@ -9,7 +9,10 @@ const { judge } = require("./judge/judge");
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: "https://coder-comp.vercel.app",
+  credentials: true,
+}));
 app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || "5mb" }));
 
 //////////////////////////////////////////////////////////
