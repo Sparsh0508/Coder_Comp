@@ -5,6 +5,7 @@ import "prismjs/themes/prism-tomorrow.css";
 import { socket } from "../socket";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { RUNNER_URL } from "../config/backend";
 
 const CodeEditor = () => {
   // 🔥 LeetCode-style boilerplates
@@ -140,8 +141,7 @@ const { user } = useAuth();
     setActiveTab("result");
 
     try {
-      const runnerUrl = import.meta.env.VITE_RUNNER_URL || "http://localhost:5001";
-      const res = await fetch(`${runnerUrl}/api/run`, {
+      const res = await fetch(`${RUNNER_URL}/api/run`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -176,8 +176,7 @@ const { user } = useAuth();
     setActiveTab("result");
 
     try {
-      const runnerUrl = import.meta.env.VITE_RUNNER_URL || "https://coder-comp-server.onrender.com";
-      const res = await fetch(`${runnerUrl}/api/submit`, {
+      const res = await fetch(`${RUNNER_URL}/api/submit`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

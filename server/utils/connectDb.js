@@ -5,8 +5,8 @@ module.exports = async function connectDb() {
 
   if (!mongoUri) {
     throw new Error("MONGODB_URI is not configured");
-  }
-
+  
+  };
   await mongoose.connect(mongoUri);
   console.log("MongoDB connected");
 };
