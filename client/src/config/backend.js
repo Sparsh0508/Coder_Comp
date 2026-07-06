@@ -31,4 +31,4 @@ function resolvePublicUrl(value, fallback) {
 export const BACKEND_URL = DEFAULT_BACKEND_URL;
 export const API_BASE_URL = resolvePublicUrl(import.meta.env.VITE_API_URL, `${DEFAULT_BACKEND_URL}/api`);
 export const SOCKET_URL = resolvePublicUrl(import.meta.env.VITE_SOCKET_URL, DEFAULT_BACKEND_URL);
-export const RUNNER_URL = resolvePublicUrl(import.meta.env.VITE_RUNNER_URL, DEFAULT_RUNNER_URL);
+export const RUNNER_URL = DEFAULT_RUNNER_URL;
