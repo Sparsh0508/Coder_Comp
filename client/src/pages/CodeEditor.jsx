@@ -5,7 +5,7 @@ import "prismjs/themes/prism-tomorrow.css";
 import { socket } from "../socket";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { RUNNER_URL } from "../config/backend";
+const RUNNER_URL ="https://coder-comp-jxv5.onrender.com";
 
 const CodeEditor = () => {
   // 🔥 LeetCode-style boilerplates
