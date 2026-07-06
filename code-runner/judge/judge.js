@@ -1,18 +1,29 @@
 const { wrapJava, wrapCpp, wrapPython, wrapJS } = require("./wrappers");
 
-// ✅ normalize input (PURE FUNCTION)
+// SAFE INPUT NORMALIZER
 function normalizeInput(input) {
+  if (!input) return "";
+
   if (typeof input === "object") {
-    const nums = JSON.parse(input.nums).join(" ");
-    const target = input.target;
-    return `${nums}\n${target}`;
+    try {
+      const nums = Array.isArray(input.nums)
+        ? input.nums
+        : JSON.parse(input.nums);
+
+      const target = input.target;
+
+      return `${nums.join(" ")}\n${target}`;
+    } catch (err) {
+      return "";
+    }
   }
-  return String(input || "");
+
+  return String(input);
 }
 
-// ✅ normalize output (IMPORTANT)
+// OUTPUT NORMALIZER
 function normalizeOutput(output) {
-  return output.replace(/\s+/g, "").trim();
+  return String(output || "").replace(/\s+/g, "").trim();
 }
 
 async function judge({ code, language, testcases, runner, timeLimit = 3000 }) {
@@ -21,15 +32,26 @@ async function judge({ code, language, testcases, runner, timeLimit = 3000 }) {
   for (let i = 0; i < testcases.length; i++) {
     const test = testcases[i];
 
+    // 🔥 SAFE GUARD (IMPORTANT FIX)
+    if (!test || !test.input) {
+      return {
+        status: "Invalid Testcase",
+        failedCase: i + 1,
+        results
+      };
+    }
+
     let finalCode = code;
 
-    // 🔥 Apply wrapper
-    if (language === "java") finalCode = wrapJava(code, test.input);
-    else if (language === "cpp") finalCode = wrapCpp(code, test.input);
-    else if (language === "python") finalCode = wrapPython(code, test.input);
-    else if (language === "javascript") finalCode = wrapJS(code, test.input);
+    const input = test.input;
 
-    const inputString = normalizeInput(test.input);
+    // WRAPPER
+    if (language === "java") finalCode = wrapJava(code, input);
+    else if (language === "cpp") finalCode = wrapCpp(code, input);
+    else if (language === "python") finalCode = wrapPython(code, input);
+    else if (language === "javascript") finalCode = wrapJS(code, input);
+
+    const inputString = normalizeInput(input);
 
     let result;
 
@@ -47,8 +69,8 @@ async function judge({ code, language, testcases, runner, timeLimit = 3000 }) {
       };
     }
 
-    const userOutput = normalizeOutput(result.output || "");
-    const expected = normalizeOutput(test.output || "");
+    const userOutput = normalizeOutput(result.output);
+    const expected = normalizeOutput(test.output);
 
     let verdict = "Accepted";
 
@@ -60,7 +82,7 @@ async function judge({ code, language, testcases, runner, timeLimit = 3000 }) {
 
     results.push({
       case: i + 1,
-      input: test.input,
+      input,
       expected: test.output,
       output: result.output,
       verdict
