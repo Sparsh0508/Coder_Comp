@@ -8,6 +8,11 @@ async function runCpp(code, input = "") {
     const id = uuid();
     const dir = path.join(__dirname, "temp", id);
 
+    console.log("=======================================");
+    console.log(`[CPP Runner] New Execution Started`);
+    console.log(`[CPP Runner] Execution ID: ${id}`);
+    console.log(`[CPP Runner] Temp Directory: ${dir}`);
+
     fs.mkdirSync(dir, { recursive: true });
 
     const sourceFile = path.join(dir, "main.cpp");
@@ -17,17 +22,28 @@ async function runCpp(code, input = "") {
     fs.writeFileSync(sourceFile, code);
     fs.writeFileSync(inputFile, input);
 
+    console.log(`[CPP Runner] Source File Created`);
+    console.log(`[CPP Runner] Input Size: ${input.length} bytes`);
+    console.log(`[CPP Runner] Code Size: ${code.length} bytes`);
+
     let finished = false;
 
     const cleanup = () => {
       try {
         fs.rmSync(dir, { recursive: true, force: true });
-      } catch {}
+        console.log(`[CPP Runner] Temp Directory Deleted`);
+      } catch (err) {
+        console.error("[CPP Runner] Cleanup Error:", err);
+      }
     };
+
+    console.time(`[CPP Runner] Compile Time ${id}`);
 
     // -------------------------
     // Compile
     // -------------------------
+    console.log("[CPP Runner] Starting Compilation...");
+
     const compile = spawn("g++", [
       "-std=c++17",
       sourceFile,
@@ -38,11 +54,18 @@ async function runCpp(code, input = "") {
 
     let compileError = "";
 
+    compile.stdout.on("data", (data) => {
+      console.log("[CPP Compile STDOUT]", data.toString());
+    });
+
     compile.stderr.on("data", (data) => {
       compileError += data.toString();
+      console.error("[CPP Compile STDERR]", data.toString());
     });
 
     compile.on("error", (err) => {
+      console.error("[CPP Runner] Compiler Spawn Error:", err);
+
       if (finished) return;
       finished = true;
       cleanup();
@@ -54,9 +77,15 @@ async function runCpp(code, input = "") {
     });
 
     compile.on("close", (code) => {
+      console.timeEnd(`[CPP Runner] Compile Time ${id}`);
+
       if (finished) return;
 
+      console.log(`[CPP Runner] Compile Exit Code: ${code}`);
+
       if (code !== 0) {
+        console.error("[CPP Runner] Compilation Failed");
+
         finished = true;
         cleanup();
 
@@ -66,9 +95,14 @@ async function runCpp(code, input = "") {
         });
       }
 
+      console.log("[CPP Runner] Compilation Successful");
+      console.log("[CPP Runner] Executable:", executable);
+
       // -------------------------
       // Run executable
       // -------------------------
+
+      console.time(`[CPP Runner] Execution Time ${id}`);
 
       const run = spawn(executable);
 
@@ -81,6 +115,8 @@ async function runCpp(code, input = "") {
       const timeout = setTimeout(() => {
         if (finished) return;
 
+        console.error("[CPP Runner] Time Limit Exceeded");
+
         finished = true;
         run.kill("SIGKILL");
         cleanup();
@@ -92,14 +128,22 @@ async function runCpp(code, input = "") {
       }, 12000);
 
       run.stdout.on("data", (data) => {
-        stdout += data.toString();
+        const text = data.toString();
+        stdout += text;
+
+        console.log("[CPP STDOUT]", text);
       });
 
       run.stderr.on("data", (data) => {
-        stderr += data.toString();
+        const text = data.toString();
+        stderr += text;
+
+        console.error("[CPP STDERR]", text);
       });
 
       run.on("error", (err) => {
+        console.error("[CPP Runner] Runtime Spawn Error:", err);
+
         if (finished) return;
 
         finished = true;
@@ -113,18 +157,30 @@ async function runCpp(code, input = "") {
       });
 
       run.on("close", (exitCode) => {
+        console.timeEnd(`[CPP Runner] Execution Time ${id}`);
+
         if (finished) return;
 
         finished = true;
         clearTimeout(timeout);
         cleanup();
 
+        console.log(`[CPP Runner] Program Exit Code: ${exitCode}`);
+
         if (exitCode !== 0) {
+          console.error("[CPP Runner] Runtime Error");
+          console.error(stderr);
+
           return resolve({
             status: "Runtime Error",
             output: stderr,
           });
         }
+
+        console.log("[CPP Runner] Execution Successful");
+        console.log("[CPP Runner] Output:");
+        console.log(stdout.trim());
+        console.log("=======================================");
 
         resolve({
           status: "Success",
