@@ -13,6 +13,7 @@ import MatchResultPage from "./pages/MatchResultPage";
 import ProfilePage from "./pages/ProfilePage";
 import WalletPage from "./pages/WalletPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
+import Problem from "./pages/Problem";
 
 function App() {
   return (
@@ -37,6 +38,7 @@ function App() {
             <Route path="/match/:matchId/lobby" element={<MatchLobbyPage />} />
             <Route path="/match/:matchId" element={<MatchRoomPage />} />
             <Route path="/match/:matchId/result" element={<MatchResultPage />} />
+            <Route path="/problem/:id" element={<Problem />} />
             <Route path="/leaderboard" element={<LeaderboardPage />} />
           </Route>
 

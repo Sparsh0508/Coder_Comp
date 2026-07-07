@@ -141,7 +141,7 @@ const { user } = useAuth();
     setActiveTab("result");
 
     try {
-      const res = await fetch(`${RUNNER_URL}/api/run`, {
+      const res = await fetch(`${RUNNER_URL}/api/execute`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

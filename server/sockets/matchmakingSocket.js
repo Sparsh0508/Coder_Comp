@@ -154,7 +154,28 @@ function scheduleLobbyStart(io, matchId) {
 }
 
 async function createMatch(io, queuedPlayers, mode) {
-  const [problem] = await Problem.aggregate([{ $sample: { size: 1 } }, { $project: { _id: 1 } }]);
+  const playerIds = queuedPlayers.map((player) => player.userId);
+  const playedMatches = await Match.find({
+    "players.user": { $in: playerIds },
+  }).select("problem");
+  const playedProblemIds = playedMatches.map((m) => m.problem).filter(Boolean);
+
+  let problem;
+  const unplayedProblems = await Problem.aggregate([
+    { $match: { _id: { $nin: playedProblemIds } } },
+    { $sample: { size: 1 } },
+  ]);
+
+  if (unplayedProblems.length > 0) {
+    problem = unplayedProblems[0];
+  } else {
+    const randomProblems = await Problem.aggregate([
+      { $sample: { size: 1 } },
+    ]);
+    if (randomProblems.length > 0) {
+      problem = randomProblems[0];
+    }
+  }
 
   if (!problem) {
     throw new Error("No problems available for matchmaking");
