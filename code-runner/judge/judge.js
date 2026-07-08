@@ -46,10 +46,10 @@ async function judge({ code, language, testcases, runner, timeLimit = 3000 }) {
     const input = test.input;
 
     // WRAPPER
-    if (language === "java") finalCode = wrapJava(code, input);
-    else if (language === "cpp") finalCode = wrapCpp(code, input);
-    else if (language === "python") finalCode = wrapPython(code, input);
-    else if (language === "javascript") finalCode = wrapJS(code, input);
+    // if (language === "java") finalCode = wrapJava(code, input);
+    // else if (language === "cpp") finalCode = wrapCpp(code, input);
+    // else if (language === "python") finalCode = wrapPython(code, input);
+    // else if (language === "javascript") finalCode = wrapJS(code, input);
 
     const inputString = normalizeInput(input);
 

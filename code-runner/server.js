@@ -161,10 +161,10 @@ app.post("/api/run", async (req, res) => {
           const normalized = normalizeInput(currInput);
           let finalCode = code;
 
-          if (language === "java") finalCode = wrapJava(code, normalized);
-          else if (language === "cpp") finalCode = wrapCpp(code, normalized);
-          else if (language === "python") finalCode = wrapPython(code, normalized);
-          else if (language === "javascript") finalCode = wrapJS(code, normalized);
+          // if (language === "java") finalCode = wrapJava(code, normalized);
+          // else if (language === "cpp") finalCode = wrapCpp(code, normalized);
+          // else if (language === "python") finalCode = wrapPython(code, normalized);
+          // else if (language === "javascript") finalCode = wrapJS(code, normalized);
 
           const result = await runner(finalCode);
           return {
