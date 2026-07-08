@@ -145,7 +145,7 @@ console.log(solve(nums, target));
 //////////////////////////////////////////////////////////
 
 app.post("/api/run", async (req, res) => {
-  const { language, code, input, inputs } = req.body;
+  const { language, code, inputs } = req.body;
   console.log("===== RUN REQUEST =====");
   console.log(req.body);
   const runner = getRunner(language);
@@ -181,7 +181,7 @@ app.post("/api/run", async (req, res) => {
     }
 
     // Single run fallback
-    const normalizedInput = normalizeInput(input);
+    // const normalizedInput = normalizeInput(input);
     let finalCode = code;
 
     if (language === "java") finalCode = wrapJava(code, normalizedInput);
@@ -208,7 +208,7 @@ app.post("/api/run", async (req, res) => {
 });
 
 app.post("/api/execute", async (req, res) => {
-  const { language, code, stdin } = req.body;
+  const { language, code, inputs } = req.body;
   console.log("===== EXECUTE REQUEST =====");
   console.log(req.body);
 
