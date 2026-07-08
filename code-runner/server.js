@@ -19,22 +19,23 @@ app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || "5mb" }));
 // 🔥 Get Runner
 //////////////////////////////////////////////////////////
 function getRunner(language) {
-  if (language === "python") return runPython;
-  if (language === "cpp") return runCpp;
-  if (language === "java") return runJava;
-  if (language === "javascript") return runJS;
-  return null;
+  switch (language) {
+    case "python":
+      return runPython;
+    case "cpp":
+      return runCpp;
+    case "java":
+      return runJava;
+    case "javascript":
+      return runJS;
+    default:
+      return null;
+  }
 }
 
 function normalizeTextInput(input) {
-  if (input === null || input === undefined) {
-    return "";
-  }
-
-  if (typeof input === "string") {
-    return input;
-  }
-
+  if (input === undefined || input === null) return "";
+  if (typeof input === "string") return input;
   return JSON.stringify(input);
 }
 
@@ -145,64 +146,65 @@ console.log(solve(nums, target));
 //////////////////////////////////////////////////////////
 
 app.post("/api/run", async (req, res) => {
-  const { language, code, inputs } = req.body;
+  const { language, code, input, inputs } = req.body;
+
   console.log("===== RUN REQUEST =====");
   console.log(req.body);
+
   const runner = getRunner(language);
+
   if (!runner) {
-    return res.status(400).json({ error: "Unsupported language" });
+    return res.status(400).json({
+      error: "Unsupported language",
+    });
   }
 
   try {
-    // 🔥 Multi-run support
-    if (Array.isArray(inputs) && inputs.length > 0) {
+    if (Array.isArray(inputs)) {
       const results = await Promise.all(
         inputs.map(async (currInput, idx) => {
-          const normalized = normalizeInput(currInput);
-          let finalCode = code;
+          const result = await runner(
+            code,
+            normalizeTextInput(currInput)
+          );
 
-          // if (language === "java") finalCode = wrapJava(code, normalized);
-          // else if (language === "cpp") finalCode = wrapCpp(code, normalized);
-          // else if (language === "python") finalCode = wrapPython(code, normalized);
-          // else if (language === "javascript") finalCode = wrapJS(code, normalized);
-
-          const result = await runner(finalCode);
           return {
             case: idx + 1,
             input: currInput,
             output: result.output || "",
             error: result.error || "",
-            verdict: result.status === "Success" ? "Accepted" : result.status || "Runtime Error"
+            verdict:
+              result.status === "Success"
+                ? "Accepted"
+                : result.status,
           };
         })
       );
-      console.log("Success")
-      return res.json({ results, status: "Success" });
+
+      return res.json({
+        status: "Success",
+        results,
+      });
     }
 
-    // Single run fallback
-    // const normalizedInput = normalizeInput(input);
-    let finalCode = code;
-
-    if (language === "java") finalCode = wrapJava(code, normalizedInput);
-    else if (language === "cpp") finalCode = wrapCpp(code, normalizedInput);
-    else if (language === "python") finalCode = wrapPython(code, normalizedInput);
-    else if (language === "javascript") finalCode = wrapJS(code, normalizedInput);
-
-    const result = await runner(finalCode);
+    const result = await runner(
+      code,
+      normalizeTextInput(input)
+    );
 
     return res.json({
+      status: result.status,
       output: result.output || "",
       error: result.error || "",
-      status: result.status,
     });
 
   } catch (err) {
     console.error(err);
-    return res.json({
+
+    return res.status(500).json({
+      status: "Runtime Error",
       output: "",
       error: "Internal Server Error",
-      status: "Runtime Error",
     });
   }
 });

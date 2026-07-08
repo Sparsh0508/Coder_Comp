@@ -10,9 +10,11 @@ function normalizeInput(input) {
         ? input.nums
         : JSON.parse(input.nums);
 
-      const target = input.target;
+      const target = Number(input.target);
 
-      return `${nums.join(" ")}\n${target}`;
+      // n target
+      // a1 a2 a3 ...
+      return `${nums.length} ${target}\n${nums.join(" ")}`;
     } catch (err) {
       return "";
     }
